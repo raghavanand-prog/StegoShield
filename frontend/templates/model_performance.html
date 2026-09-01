@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Model{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content">
+
+    <div class="page-header">
+        <div class="eyebrow">ML RESEARCH CONSOLE</div>
+        <h1 class="page-title">Model Performance</h1>
+        <p class="page-desc">
+            Every number below is read directly from the last training
+            run's saved metadata — nothing here is hand-typed. See
+            <a href="{{ url_for('pages.experiments_page') }}">Experiments</a>
+            for the cross-validated model-selection evidence this page's
+            "primary model" choice is based on.
+        </p>
+    </div>
+
+    {% if not model_status.trained %}
+    <div class="alert alert-warning">
+        No trained model found. Run <span class="kbd">python scripts/generate_dataset.py</span>
+        then <span class="kbd">python scripts/train_model.py</span> to train the steganalysis model.
+    </div>
+    {% else %}
+
+    <div class="section">
+        <div class="section-head">
+            <h2 class="section-title">Primary Model Metrics</h2>
+            <span class="section-head-rule"></span>
+            <span class="section-actions"><span class="status-badge st-warn">Experimental</span></span>
+        </div>
+        <p class="section-sub">Held-out test set — a source-photo split the model never saw during training or validation.</p>
+        <div class="stats-grid">
+            <div class="stat-cell"><div class="stat-cell-value" id="m-accuracy">—</div><div class="stat-cell-label">Accuracy</div></div>
+            <div class="stat-cell"><div class="stat-cell-value" id="m-balanced-accuracy">—</div><div class="stat-cell-label">Balanced Accuracy</div></div>
+            <div class="stat-cell"><div class="stat-cell-value" id="m-precision">—</div><div class="stat-cell-label">Precision</div></div>
+            <div class="stat-cell"><div class="stat-cell-value" id="m-recall">—</div><div class="stat-cell-label">Recall</div></div>
+            <div class="stat-cell"><div class="stat-cell-value" id="m-specificity">—</div><div class="stat-cell-label">Specificity (TNR)</div></div>
+            <div class="stat-cell"><div class="stat-cell-value" id="m-fpr">—</div><div class="stat-cell-label">False-Positive Rate</div></div>
+            <div class="stat-cell"><div class="stat-cell-value" id="m-f1">—</div><div class="stat-cell-label">F1-Score</div></div>
+            <div class="stat-cell"><div class="stat-cell-value" id="m-pr-auc">—</div><div class="stat-cell-label">PR-AUC</div></div>
+        </div>
+        <p class="field-hint mt-16">
+            Balanced accuracy, specificity, and false-positive rate are shown
+            alongside raw accuracy because this dataset's test set is
+            imbalanced (more STEGO than CLEAN samples) — raw accuracy alone
+            can look better than the model's real, honestly-reported
+            clean-image false-positive rate suggests. See
+            <span class="kbd">docs/research-notes.md</span> (Experiments B–D)
+            for the full analysis, including why the primary model was chosen
+            the way it was.
+        </p>
+    </div>
+
+    <div class="grid grid-2 mt-8">
+        <div class="card">
+            <div class="card-title" id="confusion-matrix-title">Confusion Matrix (test set)</div>
+            <table class="data-table" id="confusion-table"></table>
+        </div>
+        <div class="card">
+            <div class="card-title">ROC Curve</div>
+            <canvas id="roc-chart" height="220"></canvas>
+        </div>
+    </div>
+
+    <div class="grid grid-2 mt-16">
+        <div class="card">
+            <div class="card-title">Precision-Recall Curve</div>
+            <canvas id="pr-chart" height="220"></canvas>
+            <p class="field-hint mt-16">
+                Preferred over the ROC curve as a summary under class
+                imbalance: it directly shows how precision degrades as recall
+                increases, rather than the false-positive *rate*, which can
+                stay visually small even while the absolute false-positive
+                count (and therefore precision) collapses.
+            </p>
+        </div>
+        <div class="card">
+            <div class="card-title">TPR at a Fixed False-Positive-Rate Budget</div>
+            <table class="data-table" id="tpr-fpr-table"></table>
+            <p class="field-hint mt-16">
+                The primary-model selection criterion used in this project
+                (see <span class="kbd">docs/research-notes.md</span>,
+                Experiment D): for a human-in-the-loop triage tool, how much
+                real detection signal survives at a false-alarm rate an
+                analyst could actually tolerate matters more than a
+                full-curve average that includes unrealistic operating
+                points.
+            </p>
+        </div>
+    </div>
+
+    <div class="section-head mt-16">
+        <h2 class="section-title">Model Comparison (test set)</h2>
+        <span class="section-head-rule"></span>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+        <table class="data-table" id="comparison-table"></table>
+    </div>
+
+    <div class="section-head mt-24">
+        <h2 class="section-title">Top Feature Importances</h2>
+        <span class="section-head-rule"></span>
+    </div>
+    <div class="card">
+        <canvas id="importance-chart" height="220"></canvas>
+    </div>
+
+    <div class="section mt-16" id="primary-model-rationale-section" hidden>
+        <div class="callout">
+            <strong>Why this model was chosen.</strong>
+            <span id="primary-model-rationale"></span>
+        </div>
+    </div>
+
+    <div class="section mt-8">
+        <div class="card">
+            <div class="card-title">Dataset &amp; Training Details</div>
+            <table class="data-table" id="dataset-table"></table>
+            <p class="field-hint mt-16">
+                Train/validation/test splits are grouped by source photograph
+                (see <span class="kbd">ml/training/splitting.py</span>) so that no
+                crop — or any stego derivative of it — appears in more than one
+                split. This prevents the model from memorizing a specific
+                photo's noise fingerprint instead of learning general
+                steganalysis signals.
+            </p>
+        </div>
+    </div>
+
+    {% endif %}
+
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/vendor/chart.umd.js') }}"></script>
+<script src="{{ url_for('static', filename='js/model_performance.js') }}"></script>
+{% endblock %}

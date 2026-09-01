@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block topbar_label %}
+<span class="crumb-prefix">Workspace</span>
+<span class="crumb-sep">/</span>
+<span class="crumb-active">Overview</span>
+{% endblock %}
+{% block content %}
+
+<section class="overview-hero">
+    <div>
+        <p class="hero-kicker">Image Steganography &amp; Steganalysis Workbench</p>
+        <h1 class="hero-title">STEGO SHIELD</h1>
+        <p class="hero-sub">
+            LSB steganography encoding and extraction, statistical &amp;
+            machine-learning steganalysis, and pixel-level image comparison.
+            Every value on this site is computed live — nothing is precomputed,
+            and all processing stays on this server.
+        </p>
+        <div class="hero-actions">
+            <a class="btn btn-primary" href="{{ url_for('pages.encode_page') }}">Encode</a>
+            <a class="btn" href="{{ url_for('pages.decode_page') }}">Decode</a>
+            <a class="btn" href="{{ url_for('pages.steganalysis_page') }}">Analyze</a>
+        </div>
+    </div>
+
+    <div class="runtime-panel" role="group" aria-label="Model runtime status">
+        <div class="runtime-head">
+            <span class="runtime-title">Runtime Status</span>
+            {% if model_status.trained %}
+            <span class="status-badge st-done">Ready</span>
+            {% else %}
+            <span class="status-badge st-warn">Model not trained</span>
+            {% endif %}
+        </div>
+        <div class="runtime-body">
+            <div class="panel-row">
+                <span class="panel-row-label">Primary model</span>
+                <span class="panel-row-value">{{ model_status.primary_model if model_status.trained else "—" }}</span>
+            </div>
+            <div class="panel-row">
+                <span class="panel-row-label">ML features</span>
+                <span class="panel-row-value">{{ model_status.n_features if model_status.trained else "—" }}</span>
+            </div>
+            <div class="panel-row">
+                <span class="panel-row-label">Test ROC-AUC</span>
+                <span class="panel-row-value">{{ "%.3f"|format(model_status.test_roc_auc) if model_status.trained else "—" }}</span>
+            </div>
+            <div class="panel-row">
+                <span class="panel-row-label">Training samples</span>
+                <span class="panel-row-value">{{ dataset_stats.n_samples if dataset_stats else "—" }}</span>
+            </div>
+            <div class="panel-row">
+                <span class="panel-row-label">Source images</span>
+                <span class="panel-row-value">{{ dataset_stats.n_source_images if dataset_stats else "—" }}</span>
+            </div>
+        </div>
+        <div class="runtime-foot">
+            {% if model_status.trained %}
+            Trained at {{ model_status.trained_at }}
+            {% else %}
+            No trained model on disk — run scripts/generate_dataset.py then scripts/train_model.py
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section aria-label="Project statistics">
+    <div class="stats-grid">
+        <div class="stat-cell">
+            <div class="stat-cell-value">{{ model_status.n_features if model_status.trained else "—" }}</div>
+            <div class="stat-cell-label">ML steganalysis features</div>
+            <div class="stat-cell-note">extracted per image</div>
+        </div>
+        <div class="stat-cell">
+            <div class="stat-cell-value">{{ dataset_stats.n_samples if dataset_stats else "—" }}</div>
+            <div class="stat-cell-label">Labeled training samples</div>
+            <div class="stat-cell-note">tiled &amp; augmented crops</div>
+        </div>
+        <div class="stat-cell">
+            <div class="stat-cell-value">{{ "%.3f"|format(model_status.test_roc_auc) if model_status.trained else "—" }}</div>
+            <div class="stat-cell-label">Held-out test ROC-AUC</div>
+            <div class="stat-cell-note">experimental, small dataset</div>
+        </div>
+        <div class="stat-cell">
+            <div class="stat-cell-value">{{ dataset_stats.n_source_images if dataset_stats else "—" }}</div>
+            <div class="stat-cell-label">Base source photographs</div>
+            <div class="stat-cell-note">source-image-disjoint split</div>
+        </div>
+    </div>
+</section>
+
+<div class="callout mt-16">
+    <strong>Read the numbers honestly.</strong>
+    The current model's held-out ROC-AUC
+    ({{ "%.3f"|format(model_status.test_roc_auc) if model_status.trained else "—" }})
+    reflects a small, 9-photograph training corpus, not a production-scale
+    detector — clean images are still misclassified at a meaningful rate. See
+    <a href="{{ url_for('pages.model_performance_page') }}">Model Performance</a> for the full
+    breakdown and <a href="{{ url_for('pages.experiments_page') }}">Experiments</a> for how
+    that limitation was diagnosed.
+</div>
+<section class="section">
+    <div class="section-head">
+        <h2 class="section-title">Available workflows</h2>
+        <span class="section-head-rule"></span>
+    </div>
+    <div class="workflow-grid">
+        <div class="workflow-card">
+            <span class="workflow-kicker">Steganography</span>
+            <div class="workflow-title">Encode &amp; Decode</div>
+            <p class="workflow-desc">
+                LSB embedding with a magic-header / version / length /
+                SHA-256 payload structure. Rejects messages that exceed
+                capacity rather than silently truncating them.
+            </p>
+            <div class="workflow-actions">
+                <a class="btn btn-primary" href="{{ url_for('pages.encode_page') }}">Encode</a>
+                <a class="btn" href="{{ url_for('pages.decode_page') }}">Decode</a>
+            </div>
+        </div>
+        <div class="workflow-card">
+            <span class="workflow-kicker">Analysis</span>
+            <div class="workflow-title">Steganalysis &amp; Forensics</div>
+            <p class="workflow-desc">
+                A trained classifier over 49 statistical image features
+                flags CLEAN vs. POSSIBLE STEGO with a transparent,
+                evidence-backed explanation — plus pixel-level diff,
+                channel, and histogram analysis between two images.
+            </p>
+            <div class="workflow-actions">
+                <a class="btn btn-primary" href="{{ url_for('pages.steganalysis_page') }}">Steganalysis</a>
+                <a class="btn" href="{{ url_for('pages.image_analysis_page') }}">Image Analysis</a>
+            </div>
+        </div>
+        <div class="workflow-card">
+            <span class="workflow-kicker">Machine Learning</span>
+            <div class="workflow-title">Model Research</div>
+            <p class="workflow-desc">
+                Full model evaluation — confusion matrix, ROC/PR curves,
+                cross-validated model comparison — plus the raw experiment
+                evidence behind the primary-model decision.
+            </p>
+            <div class="workflow-actions">
+                <a class="btn btn-primary" href="{{ url_for('pages.model_performance_page') }}">Model Performance</a>
+                <a class="btn" href="{{ url_for('pages.experiments_page') }}">Experiments</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="section-head">
+        <h2 class="section-title">Recent analyses</h2>
+        <span class="section-head-rule"></span>
+    </div>
+    <p class="section-sub">This session only — resets on app restart, nothing is persisted server-side.</p>
+    <div class="table-wrap">
+        <div id="recent-activity">
+            <p class="text-dim" style="padding:12px 16px; margin:0;">Loading recent activity…</p>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

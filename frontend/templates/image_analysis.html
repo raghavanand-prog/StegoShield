@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Image Analysis{% endblock %}
+{% block topbar_label %}
+<span class="crumb-prefix">Analysis</span>
+<span class="crumb-sep">/</span>
+<span class="crumb-active">Image Analysis</span>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <div class="eyebrow">Analysis</div>
+    <h1 class="page-title">Image Analysis</h1>
+    <p class="page-desc">
+        Compare two images pixel-by-pixel — quality metrics, RGB channel
+        histograms, and an amplified difference map.
+    </p>
+</div>
+
+<section class="section" aria-labelledby="ia-input-title">
+    <div class="section-head">
+        <h2 class="section-title" id="ia-input-title">Input</h2>
+        <span class="section-head-rule"></span>
+    </div>
+
+    <div class="grid grid-2">
+        <div>
+            <div class="section-head" style="margin-bottom:10px;">
+                <span class="mono-sm text-dim">Original image</span>
+            </div>
+            <div class="upload-box" id="dropzone-original" role="button" tabindex="0" aria-label="Choose the original cover image">
+                <input type="file" id="file-original" accept=".png,.bmp,.jpg,.jpeg">
+                <div class="upload-placeholder">
+                    <span class="upload-text">Click or drag the original cover image</span>
+                </div>
+                <div class="file-state" style="display:none">
+                    <div class="file-state-body">
+                        <div class="file-state-name"><span class="file-state-name-text"></span></div>
+                        <div class="file-state-meta"></div>
+                    </div>
+                    <button type="button" class="file-clear" aria-label="Choose a different file">Change</button>
+                </div>
+            </div>
+            <img id="preview-original" class="preview-thumb" style="display:none" alt="Preview of the original image">
+        </div>
+
+        <div>
+            <div class="section-head" style="margin-bottom:10px;">
+                <span class="mono-sm text-dim">Stego / modified image</span>
+            </div>
+            <div class="upload-box" id="dropzone-modified" role="button" tabindex="0" aria-label="Choose the modified stego image">
+                <input type="file" id="file-modified" accept=".png,.bmp,.jpg,.jpeg">
+                <div class="upload-placeholder">
+                    <span class="upload-text">Click or drag the stego image to compare</span>
+                </div>
+                <div class="file-state" style="display:none">
+                    <div class="file-state-body">
+                        <div class="file-state-name"><span class="file-state-name-text"></span></div>
+                        <div class="file-state-meta"></div>
+                    </div>
+                    <button type="button" class="file-clear" aria-label="Choose a different file">Change</button>
+                </div>
+            </div>
+            <img id="preview-modified" class="preview-thumb" style="display:none" alt="Preview of the modified image">
+        </div>
+    </div>
+
+    <div class="flex-row mt-16">
+        <button class="btn btn-primary" id="compare-btn" disabled>Compare Images</button>
+        <span class="text-dim mono-sm">Both images must have identical dimensions.</span>
+    </div>
+    <div id="compare-alert" class="mt-16"></div>
+</section>
+
+<div id="results-section" class="mt-8" style="display:none" aria-live="polite">
+    <hr class="divider">
+
+    <section>
+        <div class="section-head">
+            <h2 class="section-title">Result — Quality metrics</h2>
+            <span class="section-head-rule"></span>
+            <span class="section-actions"><span class="status-badge st-done">Complete</span></span>
+        </div>
+        <div class="grid grid-2">
+            <div class="panel">
+                <div class="panel-row"><span class="panel-row-label">MSE — Mean Squared Error</span><span class="panel-row-value" id="q-mse">—</span></div>
+                <div class="panel-row"><span class="panel-row-label">PSNR — Peak Signal-to-Noise Ratio</span><span class="panel-row-value" id="q-psnr">—</span></div>
+                <div class="panel-row"><span class="panel-row-label">SSIM — Structural Similarity</span><span class="panel-row-value" id="q-ssim">—</span></div>
+                <p class="field-hint mt-8">
+                    LSB embedding typically produces PSNR above 50 dB and SSIM near 1.0 —
+                    both indicate the two images are visually indistinguishable, even
+                    though every embedded bit changed a pixel value by ±1.
+                </p>
+            </div>
+            <div class="panel">
+                <div class="panel-row"><span class="panel-row-label">Original dimensions</span><span class="panel-row-value" id="meta-original">—</span></div>
+                <div class="panel-row"><span class="panel-row-label">Modified dimensions</span><span class="panel-row-value" id="meta-modified">—</span></div>
+                <p class="field-hint mt-8">
+                    A dimension mismatch is rejected by the server before any
+                    metric computation. The comparison requires identical
+                    pixel dimensions.
+                </p>
+            </div>
+        </div>
+    </section>
+<section class="mt-24">
+        <div class="section-head">
+            <h2 class="section-title">Visual comparison</h2>
+            <span class="section-head-rule"></span>
+        </div>
+        <p class="section-sub">
+            The difference map amplifies pixel changes ×40 to make them visible —
+            raw LSB changes are ±1 per channel and invisible to the naked eye.
+        </p>
+        <div class="image-compare-grid">
+            <div class="image-compare-item"><img id="img-original" alt="Original image"><div class="image-compare-label">Original</div></div>
+            <div class="image-compare-item"><img id="img-modified" alt="Modified image"><div class="image-compare-label">Modified</div></div>
+            <div class="image-compare-item"><img id="img-diff" alt="Amplified difference image"><div class="image-compare-label">Difference (×40)</div></div>
+        </div>
+    </section>
+
+    <section class="mt-24">
+        <div class="section-head">
+            <h2 class="section-title">Channel histograms</h2>
+            <span class="section-head-rule"></span>
+        </div>
+        <p class="section-sub">
+            Per-channel pixel-value distribution, original vs. modified. LSB
+            embedding subtly flattens the low-order bit distribution without
+            visibly shifting the overall histogram shape.
+        </p>
+        <div class="panel">
+            <img id="img-hist" alt="RGB channel histogram comparison" style="width:100%; border-radius:6px; border:1px solid var(--border); display:block;">
+        </div>
+    </section>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/image_analysis.js') }}"></script>
+{% endblock %}

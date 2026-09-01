@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Documentation{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content">
+
+    <div class="page-header">
+        <div class="eyebrow">DOCUMENTATION</div>
+        <h1 class="page-title">Documentation</h1>
+        <p class="page-desc">
+            How StegoShield actually works — architecture, algorithms, ML
+            pipeline, security controls, evaluation methodology, and stated
+            limitations. For the empirical evidence behind the ML decisions,
+            see <a href="{{ url_for('pages.experiments_page') }}">Experiments</a>.
+        </p>
+    </div>
+
+    <div class="docs-layout">
+        <nav class="docs-toc" aria-label="Documentation sections">
+            <a href="#architecture">Architecture</a>
+            <a href="#steganography">Steganography</a>
+            <a href="#steganalysis">Steganalysis</a>
+            <a href="#ml-pipeline">ML Pipeline</a>
+            <a href="#security">Security</a>
+            <a href="#evaluation">Evaluation</a>
+            <a href="#limitations">Limitations</a>
+        </nav>
+
+        <div>
+            <section class="docs-section" id="architecture">
+                <h2>Architecture</h2>
+                <p>
+                    StegoShield is a same-origin Flask application: a server-
+                    rendered Jinja frontend calls a JSON REST API
+                    (<code>/api/*</code>) on the same server — no separate
+                    frontend service, no cross-origin calls. Every uploaded
+                    image is validated (extension allow-list, real content
+                    sniffing, size and dimension limits) before it reaches
+                    either the steganography engine or the steganalysis
+                    engine.
+                </p>
+                <ul>
+                    <li><strong>Steganography engine</strong> (<code>app/steganography/</code>) — LSB embedding/extraction and payload framing.</li>
+                    <li><strong>Steganalysis engine</strong> (<code>app/steganalysis/</code>) — 49-feature extraction, model inference, risk scoring.</li>
+                    <li><strong>Image quality &amp; diff analysis</strong> (<code>app/services/</code>) — MSE/PSNR/SSIM, channel and histogram comparison.</li>
+                    <li><strong>Offline training pipeline</strong> (<code>scripts/</code>, <code>ml/</code>) — dataset generation, model training, evaluation; run separately from the web app and its output (<code>ml/models/steganalysis_model.joblib</code>) loaded at request time.</li>
+                </ul>
+                <p>All processing happens locally on the server the app runs on — no uploaded image or extracted message is ever sent to a third-party service.</p>
+            </section>
+
+            <section class="docs-section" id="steganography">
+                <h2>Steganography</h2>
+                <p>
+                    StegoShield uses <strong>Least Significant Bit (LSB)
+                    embedding</strong>. For an 8-bit channel value <code>p</code>
+                    and secret bit <code>b</code>:
+                </p>
+                <ul>
+                    <li>embed: <code>p' = (p &amp; 0xFE) | b</code> — clear the low bit, then set it to <code>b</code></li>
+                    <li>extract: <code>b = p' &amp; 1</code> — read the low bit back out</li>
+                </ul>
+                <p>
+                    Because <code>p'</code> differs from <code>p</code> by at
+                    most 1 (of 255), the change is imperceptible. Bits are
+                    embedded sequentially across the flattened R, G, B bytes
+                    in row-major order; any alpha channel is left untouched.
+                </p>
+                <p>
+                    The secret message is wrapped in a framed payload before
+                    embedding — <code>MAGIC (4B) + VERSION (1B) + LENGTH (4B) + SHA-256(message) (32B) + message (N bytes)</code>.
+                    Decoding checks the magic bytes first (distinguishing "not
+                    a StegoShield image" from "corrupted StegoShield image"),
+                    then re-hashes the extracted bytes and compares against
+                    the stored checksum before trusting them.
+                </p>
+            </section>
+
+            <section class="docs-section" id="steganalysis">
+                <h2>Steganalysis</h2>
+                <p>
+                    Steganalysis is the defensive counterpart: statistically
+                    estimating whether an image <em>likely</em> contains a
+                    hidden payload, without needing the original cover for
+                    comparison. LSB embedding measurably perturbs a natural
+                    image's statistics even though it's visually invisible —
+                    it tends to flatten the entropy of the LSB bit-plane
+                    toward a uniform 50/50 distribution and weakens the
+                    correlation between neighbouring pixels that real
+                    photographs normally exhibit.
+                </p>
+                <p>
+                    StegoShield extracts 49 such features per image — channel
+                    statistics, entropy, LSB-plane statistics, adjacent-pixel
+                    correlation, noise residuals, histogram characteristics,
+                    and cross-channel correlation — and feeds them to a
+                    trained classifier that outputs a CLEAN / POSSIBLE STEGO
+                    verdict, a probability, and a risk level.
+                </p>
+            </section>
+
+            <section class="docs-section" id="ml-pipeline">
+                <h2>ML Pipeline</h2>
+                <ul>
+                    <li><strong>Dataset generation</strong> — 9 public-domain photographs (<code>skimage.data</code>) tiled into 256×256 crops, flip/rotate-augmented, then LSB-encoded at 5 payload levels (5/10/20/30/50% capacity utilization).</li>
+                    <li><strong>Feature extraction</strong> — the same 49-feature extractor used at inference time.</li>
+                    <li><strong>Leak-safe split</strong> — grouped by <em>source photograph</em>, not by individual crop: no crop, augmentation, or payload-level derivative of one photo ever crosses a train/val/test boundary.</li>
+                    <li><strong>Model training</strong> — Random Forest, Logistic Regression, and Gradient Boosting trained on the identical split; Random Forest is the deployed primary model.</li>
+                    <li><strong>Evaluation</strong> — accuracy, precision, recall, F1, balanced accuracy, specificity, false-positive rate, ROC-AUC, PR-AUC, and TPR at a fixed FPR budget, independently reproducible by reloading the saved model.</li>
+                </ul>
+                <p>
+                    <strong>Why Random Forest, not deep learning?</strong> A
+                    classical statistical-feature classifier is appropriate
+                    for a 960-sample, 9-photo corpus — deep learning on raw
+                    pixels needs far more data than this project's small
+                    demonstration corpus provides, and would risk memorizing
+                    the 9 source photos rather than learning a transferable
+                    signal.
+                </p>
+            </section>
+
+            <section class="docs-section" id="security">
+                <h2>Security</h2>
+                <p>Every upload goes through defense-in-depth validation before it reaches any image-processing code:</p>
+                <ul>
+                    <li>Filename extension allow-list, independent of the declared content type.</li>
+                    <li>Real content-type sniffing via libmagic — a renamed non-image file is rejected even if its extension looks correct.</li>
+                    <li>File-size limit enforced both at the WSGI layer and again in application code.</li>
+                    <li>Pixel-dimension ceiling to prevent decompression-bomb-style memory exhaustion.</li>
+                    <li>Rejections return a safe JSON error with no stack traces or internal paths.</li>
+                </ul>
+                <p>Response headers set on every request:</p>
+                <ul>
+                    <li><code>Content-Security-Policy: default-src 'self'</code>, with a scoped <code>img-src 'self' data: blob:</code> exception for local upload-preview thumbnails — no third-party script, style, or connect exceptions.</li>
+                    <li><code>X-Content-Type-Options: nosniff</code>, <code>X-Frame-Options: DENY</code>, <code>Referrer-Policy: no-referrer</code>.</li>
+                </ul>
+                <p>
+                    Fonts, charts, and this application's own JavaScript are
+                    all vendored locally rather than loaded from a CDN — the
+                    app works fully offline and the CSP needs no third-party
+                    host exceptions. On the frontend, values that could
+                    originate from user input, uploaded filenames, or API
+                    responses are rendered via <code>textContent</code> and
+                    DOM APIs rather than <code>innerHTML</code> string
+                    interpolation.
+                </p>
+            </section>
+
+            <section class="docs-section" id="evaluation">
+                <h2>Evaluation</h2>
+                <p>
+                    Model metrics on this site are read directly from the
+                    last training run's saved artifact
+                    (<code>ml/models/model_metadata.json</code>) — nothing on
+                    the <a href="{{ url_for('pages.model_performance_page') }}">Model</a>
+                    or <a href="{{ url_for('pages.experiments_page') }}">Experiments</a>
+                    pages is hand-typed. The primary model
+                    (Random Forest, <code>class_weight=None</code>) was
+                    selected using 9-fold leave-one-source-photo-out
+                    cross-validation, on TPR at a fixed ≤20% false-positive
+                    budget — chosen because this application is framed as a
+                    human-in-the-loop triage aid, not an autonomous blocker,
+                    so the relevant question is how much real signal survives
+                    at a false-alarm rate an analyst could tolerate.
+                </p>
+                <p>
+                    That criterion is a stated judgment call, not an
+                    objective fact: Gradient Boosting wins on balanced
+                    accuracy and specificity in the same cross-validation,
+                    and would be the more defensible choice under a
+                    symmetric-cost assumption. See
+                    <a href="{{ url_for('pages.experiments_page') }}">Experiments</a>
+                    for the full comparison table.
+                </p>
+            </section>
+
+            <section class="docs-section" id="limitations">
+                <h2>Limitations</h2>
+                <p>This is a portfolio / research-demonstration project, not a production intrusion-detection system:</p>
+                <ul>
+                    <li><strong>Small, correlated corpus.</strong> All samples derive from 9 public-domain photographs, orders of magnitude smaller than research-grade corpora such as BOSSbase (10,000 images) or ALASKA2 (75,000+ images). Crops from the same source photo share content/texture and are not fully independent samples.</li>
+                    <li><strong>Clean-image false positives.</strong> Even the current model still misclassifies roughly 3 in 10 clean images on the held-out test split — documented on the <a href="{{ url_for('pages.model_performance_page') }}">Model</a> page's confusion matrix, not hidden.</li>
+                    <li><strong>Low-payload detection is hard.</strong> Small embedded payloads perturb less of the image statistics and are measurably harder to detect than large ones — expected and literature-consistent, but a real limitation of this model.</li>
+                    <li><strong>Single embedding algorithm.</strong> The classifier is trained only against StegoShield's own sequential LSB embedder; it has not been evaluated against other steganography tools, randomized bit placement, or JPEG-domain (DCT) steganography.</li>
+                    <li><strong>Synthetic payloads.</strong> Embedded messages are random printable ASCII text, not real-world payload content, which may have different entropy characteristics.</li>
+                </ul>
+                <p class="field-hint">Full discussion, including the diagnostic experiments behind these findings, is in <code>docs/research-notes.md</code> in the repository.</p>
+            </section>
+        </div>
+    </div>
+
+</div>
+</div>
+{% endblock %}

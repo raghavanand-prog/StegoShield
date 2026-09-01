@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Steganalysis{% endblock %}
+{% block topbar_label %}
+<span class="crumb-prefix">Analysis</span>
+<span class="crumb-sep">/</span>
+<span class="crumb-active">Steganalysis</span>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <div class="eyebrow">Analysis</div>
+    <h1 class="page-title">Steganalysis</h1>
+    <p class="page-desc">
+        Statistical &amp; machine-learning detection of possible hidden payloads.
+        Every value below is computed live from the uploaded image against the
+        trained model — nothing is precomputed.
+    </p>
+</div>
+
+<section class="section" aria-labelledby="sa-input-title">
+    <div class="section-head">
+        <h2 class="section-title" id="sa-input-title">Input</h2>
+        <span class="section-head-rule"></span>
+    </div>
+
+    <div class="grid grid-2">
+        <div>
+            <div class="upload-box" id="dropzone" role="button" tabindex="0" aria-label="Choose an image to analyze">
+                <input type="file" id="file-input" accept=".png,.bmp,.jpg,.jpeg">
+                <div class="upload-placeholder">
+                    <svg class="upload-icon" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 3v12M11 15l-4-4M11 15l4-4M3 18h16" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="upload-text">Click or drag an image here</span>
+                    <span class="upload-hint">The trained classifier estimates the probability this image contains hidden data.</span>
+                </div>
+                <div class="file-state" style="display:none">
+                    <svg class="file-state-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 2h8v12H4z" stroke="currentColor" stroke-width="1.3"/><path d="M6 6h4M6 9h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+                    <div class="file-state-body">
+                        <div class="file-state-name"><span class="file-state-name-text"></span></div>
+                        <div class="file-state-meta"></div>
+                    </div>
+                    <button type="button" class="file-clear" aria-label="Choose a different file">Change</button>
+                </div>
+            </div>
+            <img id="preview-img" class="preview-thumb" style="display:none" alt="Preview of the image to analyze">
+            <button class="btn btn-primary btn-block mt-16" id="analyze-btn" disabled>Run Steganalysis</button>
+            <div id="analyze-alert" class="mt-16"></div>
+        </div>
+
+        <div class="panel" aria-label="Analysis quick reference">
+            <p class="field-hint" style="margin:0 0 12px;">
+                The classifier runs 49 statistical image features through a trained
+                Random Forest and reports the probability that the image was
+                steganographically modified.
+            </p>
+            <div class="panel-row"><span class="panel-row-label">Classification threshold</span><span class="panel-row-value">P(stego) ≥ 0.5</span></div>
+            <div class="panel-row"><span class="panel-row-label">Risk scale</span><span class="panel-row-value">0–100</span></div>
+            <div class="panel-row"><span class="panel-row-label">Feature set</span><span class="panel-row-value">49 statistical</span></div>
+        </div>
+    </div>
+</section>
+
+<section class="section" id="result-section" style="display:none" aria-live="polite">
+    <div class="section-head">
+        <h2 class="section-title">Result</h2>
+        <span class="section-head-rule"></span>
+        <span class="section-actions">
+            <span class="status-badge st-ready" id="analysis-status">Ready</span>
+        </span>
+    </div>
+
+    <div id="verdict-empty" class="verdict-sub" style="padding: 8px 0;">No analysis run yet.</div>
+
+    <div id="verdict-panel" style="display:none">
+        <div class="verdict-block">
+            <div class="verdict-cell">
+                <div class="vc-label">Classification</div>
+                <div class="flex-row">
+                    <span class="badge" id="prediction-badge">—</span>
+                    <span class="badge" id="risk-badge">—</span>
+                </div>
+                <div class="flex-between mt-16">
+                    <span class="text-dim mono-sm">Stego probability</span>
+                    <span class="mono text-dim mono-sm" id="prob-pct">0%</span>
+                </div>
+                <div class="progress-track mt-8"><div class="progress-fill" id="prob-fill" style="width:0%"></div></div>
+            </div>
+            <div class="verdict-cell">
+                <div class="vc-label">Risk</div>
+                <div class="panel-row"><span class="panel-row-label">Risk score</span><span class="panel-row-value" id="risk-score">—</span></div>
+                <div class="panel-row"><span class="panel-row-label">Image dimensions</span><span class="panel-row-value" id="v-dims">—</span></div>
+                <div class="panel-row"><span class="panel-row-label">Processing time</span><span class="panel-row-value" id="v-time">—</span></div>
+                <div class="panel-row"><span class="panel-row-label">Model</span><span class="panel-row-value" id="model-name-value">—</span></div>
+                <p class="verdict-sub" id="risk-desc" style="margin:0;"></p>
+                <p class="field-hint mt-8" id="risk-disclaimer"></p>
+            </div>
+        </div>
+    </div>
+</section>
+<section class="section" id="evidence-section" style="display:none">
+    <div class="section-head">
+        <h2 class="section-title">Evidence</h2>
+        <span class="section-head-rule"></span>
+    </div>
+    <p class="section-sub">
+        The statistical features that contributed most to this prediction,
+        ranked by combined deviation from the clean-image baseline and the
+        model's learned feature importance.
+    </p>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Observation</th>
+                    <th>Value</th>
+                    <th>Model importance</th>
+                </tr>
+            </thead>
+            <tbody id="evidence-tbody"></tbody>
+        </table>
+    </div>
+</section>
+
+<section class="section" aria-labelledby="sa-model-title">
+    <div class="section-head">
+        <h2 class="section-title" id="sa-model-title">Model</h2>
+        <span class="section-head-rule"></span>
+    </div>
+    {% if model_status.trained %}
+    <div class="panel">
+        <div class="panel-row"><span class="panel-row-label">Classifier</span><span class="panel-row-value">{{ model_status.primary_model }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">Feature vector</span><span class="panel-row-value">{{ model_status.n_features }} statistical features</span></div>
+        <div class="panel-row"><span class="panel-row-label">Held-out ROC-AUC</span><span class="panel-row-value">{{ "%.3f"|format(model_status.test_roc_auc) }}</span></div>
+        <p class="field-hint mt-8">
+            Selection criterion and full evaluation detail on the
+            <a href="{{ url_for('pages.model_performance_page') }}">Model Performance page</a>.
+        </p>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        No trained model found. Run scripts/generate_dataset.py then
+        scripts/train_model.py to enable analysis.
+    </div>
+    {% endif %}
+</section>
+
+<section class="section" id="interpretation-section" style="display:none">
+    <div class="section-head">
+        <h2 class="section-title">Interpretation</h2>
+        <span class="section-head-rule"></span>
+    </div>
+    <p class="section-sub" id="interpretation-intro"></p>
+    <div class="panel">
+        <ul class="indicator-list" id="interpretation-list"></ul>
+    </div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/steganalysis.js') }}"></script>
+{% endblock %}

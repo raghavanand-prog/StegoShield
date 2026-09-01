@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}StegoShield{% endblock %} · StegoShield</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {# Minimal monochrome pixel-grid favicon - no emoji, no shield cliches. #}
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230a0c10'/%3E%3Crect x='3' y='3' width='4' height='4' fill='%2360a5fa'/%3E%3Crect x='9' y='3' width='4' height='4' fill='%239aa2b8'/%3E%3Crect x='3' y='9' width='4' height='4' fill='%239aa2b8'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%233b82f6'/%3E%3C/svg%3E">
+    {% block head %}{% endblock %}
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to content</a>
+
+<div class="app-shell" id="app-shell">
+
+    {# ---------- Sidebar (reused as the mobile off-canvas drawer) ---------- #}
+    <div class="sidebar-overlay" data-sidebar-close aria-hidden="true"></div>
+    <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
+        <div class="sidebar-brand">
+            <a href="{{ url_for('pages.dashboard') }}" class="brand-link">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor" opacity="0.55"/>
+                        <rect x="13" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                        <rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                        <rect x="13" y="13" width="8" height="8" rx="1.5" fill="currentColor"/>
+                    </svg>
+                </span>
+                <span class="brand-text">
+                    <span class="brand-name">StegoShield</span>
+                    <span class="brand-sub">Steganography workbench</span>
+                </span>
+            </a>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <div class="nav-group-label">Workspace</div>
+                <a href="{{ url_for('pages.dashboard') }}" class="nav-item {{ 'active' if active_page == 'dashboard' }}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}>Overview</a>
+            </div>
+
+            <div class="nav-group">
+                <div class="nav-group-label">Steganography</div>
+                <a href="{{ url_for('pages.encode_page') }}" class="nav-item {{ 'active' if active_page == 'encode' }}" {% if active_page == 'encode' %}aria-current="page"{% endif %}>Encode</a>
+                <a href="{{ url_for('pages.decode_page') }}" class="nav-item {{ 'active' if active_page == 'decode' }}" {% if active_page == 'decode' %}aria-current="page"{% endif %}>Decode</a>
+            </div>
+
+            <div class="nav-group">
+                <div class="nav-group-label">Analysis</div>
+                <a href="{{ url_for('pages.steganalysis_page') }}" class="nav-item {{ 'active' if active_page == 'steganalysis' }}" {% if active_page == 'steganalysis' %}aria-current="page"{% endif %}>Steganalysis</a>
+                <a href="{{ url_for('pages.image_analysis_page') }}" class="nav-item {{ 'active' if active_page == 'image_analysis' }}" {% if active_page == 'image_analysis' %}aria-current="page"{% endif %}>Image Analysis</a>
+            </div>
+
+            <div class="nav-group">
+                <div class="nav-group-label">Machine Learning</div>
+                <a href="{{ url_for('pages.model_performance_page') }}" class="nav-item {{ 'active' if active_page == 'model_performance' }}" {% if active_page == 'model_performance' %}aria-current="page"{% endif %}>Model Performance</a>
+                <a href="{{ url_for('pages.experiments_page') }}" class="nav-item {{ 'active' if active_page == 'experiments' }}" {% if active_page == 'experiments' %}aria-current="page"{% endif %}>Experiments</a>
+            </div>
+
+            <div class="nav-group">
+                <div class="nav-group-label">Documentation</div>
+                <a href="{{ url_for('pages.docs_page') }}" class="nav-item {{ 'active' if active_page == 'docs' }}" {% if active_page == 'docs' %}aria-current="page"{% endif %}>Documentation</a>
+                <a href="{{ url_for('pages.about_page') }}" class="nav-item {{ 'active' if active_page == 'about' }}" {% if active_page == 'about' %}aria-current="page"{% endif %}>About</a>
+            </div>
+        </nav>
+<div class="sidebar-footer">
+            <span class="privacy-note">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2 2.5 4v4c0 3.4 2.3 6 5.5 6s5.5-2.6 5.5-6V4L8 2z" stroke="currentColor" stroke-width="1.2"/><path d="M6 8l1.5 1.5L10.5 6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                All processing is local.
+            </span>
+        </div>
+    </aside>
+
+    {# ---------- Main column: topbar + content + footer ---------- #}
+    <div class="main-col">
+        <header class="topbar">
+            <button class="mobile-menu-btn" data-sidebar-open aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
+            <div class="topbar-context">{% block topbar_label %}{% endblock %}</div>
+            <div class="topbar-spacer"></div>
+            <div class="status-pill" id="model-status-pill" role="status" aria-live="polite">
+                <span class="status-dot status-dot-unknown"></span>
+                <span>Checking model…</span>
+            </div>
+        </header>
+
+        <main class="main-content" id="main-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="site-footer">
+            <span>StegoShield · processed locally, never sent to a third party.</span>
+            <span class="footer-links">
+                <a href="{{ url_for('pages.docs_page') }}">Documentation</a>
+                <a href="{{ url_for('pages.about_page') }}">About</a>
+                <a href="{{ url_for('pages.experiments_page') }}">Experiments</a>
+            </span>
+        </footer>
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Error · StegoShield</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="app-shell">
+    <main class="main-col" style="min-height:100vh;">
+        <div class="main-content" style="display:flex; align-items:center; justify-content:center; min-height:100vh;">
+            <div class="panel" style="max-width:440px; width:100%; text-align:center; padding:28px 30px;">
+                <div class="eyebrow" style="justify-content:center; width:100%;">500 · Server Error</div>
+                <h1 class="page-title">Something went wrong</h1>
+                <p class="text-mid" style="font-size:13.5px; line-height:1.7; margin-bottom:24px;">
+                    An unexpected error occurred while processing your request.
+                    The details have been recorded in the server log.
+                </p>
+                <a href="{{ url_for('pages.dashboard') }}" class="btn btn-primary">Return to Overview</a>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

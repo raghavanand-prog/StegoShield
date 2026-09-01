@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Decode{% endblock %}
+{% block topbar_label %}
+<span class="crumb-prefix">Steganography</span>
+<span class="crumb-sep">/</span>
+<span class="crumb-active">Decode</span>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <div class="eyebrow">Steganography</div>
+    <h1 class="page-title">Decode</h1>
+    <p class="page-desc">
+        Extract a hidden payload from an image and verify its integrity
+        before trusting it. This is a forensic extraction workflow — the same
+        checks a steganography examiner would run on an evidence image.
+    </p>
+</div>
+
+<ol class="steps" aria-label="Decoding workflow">
+    <li class="step"><span class="step-num">01</span> Upload stego image</li>
+    <li class="step is-current"><span class="step-num">02</span> Extract payload</li>
+    <li class="step"><span class="step-num">03</span> Verify integrity</li>
+</ol>
+
+<div class="grid grid-2">
+    <section aria-labelledby="dec-upload-title">
+        <div class="section-head">
+            <h2 class="section-title" id="dec-upload-title">1 · Stego image</h2>
+            <span class="section-head-rule"></span>
+        </div>
+
+        <div class="upload-box" id="dropzone" role="button" tabindex="0" aria-label="Choose an image to decode">
+            <input type="file" id="file-input" accept=".png,.bmp,.jpg,.jpeg">
+            <div class="upload-placeholder">
+                <svg class="upload-icon" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><path d="M11 3v12M11 15l-4-4M11 15l4-4M3 18h16" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="upload-text">Click or drag an image here</span>
+                <span class="upload-hint">PNG, BMP, JPG or JPEG — we check for a valid StegoShield payload and verify its integrity.</span>
+            </div>
+            <div class="file-state" style="display:none">
+                <svg class="file-state-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 2h8v12H4z" stroke="currentColor" stroke-width="1.3"/><path d="M6 6h4M6 9h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+                <div class="file-state-body">
+                    <div class="file-state-name"><span class="file-state-name-text"></span></div>
+                    <div class="file-state-meta"></div>
+                </div>
+                <button type="button" class="file-clear" aria-label="Choose a different file">Change</button>
+            </div>
+        </div>
+
+        <img id="preview-img" class="preview-thumb" style="display:none" alt="Preview of the uploaded stego image">
+
+        <div class="table-wrap mt-16" id="info-panel" style="display:none">
+            <table class="data-table" aria-label="Uploaded image information">
+                <tbody>
+                    <tr><td class="text-dim">Filename</td><td class="mono" id="info-filename">—</td></tr>
+                    <tr><td class="text-dim">Format</td><td class="mono" id="info-format">—</td></tr>
+                    <tr><td class="text-dim">Dimensions</td><td class="mono" id="info-dimensions">—</td></tr>
+                    <tr><td class="text-dim">File size</td><td class="mono" id="info-filesize">—</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button class="btn btn-primary btn-block mt-16" id="decode-btn" disabled>Extract &amp; Verify Payload</button>
+    </section>
+
+    <section aria-labelledby="dec-payload-title">
+        <div class="section-head">
+            <h2 class="section-title" id="dec-payload-title">Payload</h2>
+            <span class="section-head-rule"></span>
+            <span class="section-actions">
+                <span class="status-badge st-ready" id="decode-status">Ready</span>
+            </span>
+        </div>
+
+        <div id="decode-alert"></div>
+
+        <div id="decode-empty" class="verdict-sub" style="padding: 8px 0;">
+            Upload a stego image above to extract and verify its payload.
+        </div>
+
+        <div class="verdict-cell" id="decode-result" style="display:none">
+            <div class="flex-row">
+                <span class="status-badge st-done" id="integrity-badge">Verified</span>
+                <span class="text-dim mono-sm" id="integrity-note"></span>
+            </div>
+            <div class="panel-row mt-8"><span class="panel-row-label">Payload length</span><span class="panel-row-value" id="d-length">—</span></div>
+            <div class="panel-row"><span class="panel-row-label">Payload version</span><span class="panel-row-value" id="d-version">—</span></div>
+            <div class="panel-row"><span class="panel-row-label">Processing time</span><span class="panel-row-value" id="d-time">—</span></div>
+            <div class="sha-row">
+                <span class="sha-key">SHA-256</span>
+                <span class="hash-wrap" id="d-sha">—</span>
+                <button class="copy-btn" id="d-sha-copy" type="button" aria-label="Copy SHA-256 digest">Copy</button>
+            </div>
+            <label class="field-label mt-16" for="message-output">Extracted message</label>
+            <textarea id="message-output" readonly></textarea>
+        </div>
+    </section>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/decode.js') }}"></script>
+{% endblock %}

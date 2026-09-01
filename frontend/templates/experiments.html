@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Experiments{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content">
+
+    <div class="page-header">
+        <div class="eyebrow">RESEARCH NOTEBOOK</div>
+        <h1 class="page-title">Experiments</h1>
+        <p class="page-desc">
+            The empirical work behind StegoShield's design decisions, run
+            directly from this repository's scripts and re-generated from the
+            real dataset — not marketing claims. Full methodology and
+            discussion in <span class="mono">docs/research-notes.md</span>.
+        </p>
+    </div>
+
+    {# ---------------- Experiment A ---------------- #}
+    <div class="section">
+        <div class="section-head" style="margin-bottom: 14px;">
+            <h2 class="section-title">Experiment A — Payload size vs. image quality</h2>
+            <span class="section-head-rule"></span>
+            <span class="section-actions"><span class="badge badge-neutral">scripts/run_experiments.py</span></span>
+        </div>
+        <p class="section-sub">
+            Mean MSE / PSNR / SSIM between each stego image and its unmodified
+            cover, averaged across all
+            {% if quality_summary %}{{ quality_summary[0].n_images }}{% else %}9{% endif %}
+            base cover images at each target capacity-utilization level.
+        </p>
+
+        {% if quality_summary %}
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Payload level</th>
+                        <th>Mean MSE</th>
+                        <th>Mean PSNR (dB)</th>
+                        <th>Mean SSIM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in quality_summary %}
+                    <tr>
+                        <td class="mono">{{ (row.utilization_percent or (row.payload_level * 100)) | round(0, 'floor') | int }}%</td>
+                        <td class="mono">{{ "%.4f"|format(row.mean_mse) }}</td>
+                        <td class="mono">{{ "%.2f"|format(row.mean_psnr_db) }}</td>
+                        <td class="mono">{{ "%.5f"|format(row.mean_ssim) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="field-hint mt-8">
+            MSE grows almost linearly with payload size; PSNR falls off
+            logarithmically. Even at 50% capacity utilization, PSNR stays
+            above 54&nbsp;dB and SSIM above 0.995 — both conventionally
+            considered visually indistinguishable from the original. This is
+            why visual inspection alone cannot detect LSB steganography, and
+            motivates the statistical/ML approach below.
+        </p>
+        {% else %}
+        <div class="alert alert-info">No experiment_results.json data found on disk yet — run scripts/run_experiments.py to populate this section.</div>
+        {% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    {# ---------------- Experiment B ---------------- #}
+    <div class="section">
+        <div class="section-head" style="margin-bottom: 14px;">
+            <h2 class="section-title">Experiment B — Payload size vs. detection accuracy</h2>
+            <span class="section-head-rule"></span>
+            <span class="section-actions"><span class="badge badge-neutral">held-out photos: chelsea, retina</span></span>
+        </div>
+        <p class="section-sub">
+            Detection accuracy of the current production model, computed
+            separately for clean images and for stego images at each payload
+            level, on a held-out test split never seen during training.
+        </p>
+
+        {% set pvda = (experiment_results or {}).get('payload_vs_detection_accuracy') if experiment_results else None %}
+        {% if pvda %}
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Sample group</th>
+                        <th>n</th>
+                        <th>Accuracy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in pvda %}
+                    <tr>
+                        <td>
+                            {% if row.payload_level == 0 %}
+                            <span class="badge badge-clean">{{ row.label }}</span>
+                            {% else %}
+                            <span class="badge badge-stego">{{ row.label }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="mono">{{ row.n_samples }}</td>
+                        <td class="mono">{{ "%.1f"|format(row.accuracy * 100) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="field-hint mt-8">
+            Low-payload detection is genuinely hard — a well-documented
+            limitation in the steganalysis literature, not unique to this
+            project. Clean-image accuracy of roughly 70% also means about
+            3 in 10 clean images are still wrongly flagged; see Experiments
+            C and D for why, and the <a href="{{ url_for('pages.model_performance_page') }}">Model page</a>
+            for the current confusion matrix.
+        </p>
+        {% else %}
+        <div class="alert alert-info">No payload_vs_detection_accuracy data found on disk yet.</div>
+        {% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    {# ---------------- Experiment C ---------------- #}
+    <div class="section">
+        <div class="section-head" style="margin-bottom: 14px;">
+            <h2 class="section-title">Experiment C — Does class-weighting explain the false-positive bias?</h2>
+            <span class="section-head-rule"></span>
+            <span class="section-actions"><span class="badge badge-neutral">scripts/experiment_class_balance.py</span></span>
+        </div>
+        <p class="section-sub">
+            Three otherwise-identical Random Forests (n_estimators=300,
+            same split), varying only how the 5:1 STEGO:CLEAN training
+            imbalance is handled. Single held-out photo pair — see
+            Experiment D for the 9-fold cross-validated follow-up.
+        </p>
+
+        {% if class_balance and class_balance.results %}
+        {% set cb = class_balance.results %}
+        <div class="card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Condition</th>
+                        <th>Accuracy</th>
+                        <th>Clean accuracy</th>
+                        <th>Stego recall</th>
+                        <th>ROC-AUC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, label in [('A_balanced', "A — class_weight='balanced' (former default)"), ('B_none_imbalanced', "B — class_weight=None"), ('C_undersampled', "C — undersampled 1:1, class_weight=None")] %}
+                    {% if cb[key] %}
+                    {% set r = cb[key] %}
+                    {% set cm = r.confusion_matrix %}
+                    {% set clean_acc = cm.true_negative / (cm.true_negative + cm.false_positive) if (cm.true_negative + cm.false_positive) > 0 else 0 %}
+                    <tr{% if key == 'B_none_imbalanced' %} class="is-selected"{% endif %}>
+                        <td>{{ label }}{% if key == 'B_none_imbalanced' %} <span class="badge badge-primary">selected direction</span>{% endif %}</td>
+                        <td class="mono">{{ "%.1f"|format(r.accuracy * 100) }}%</td>
+                        <td class="mono">{{ "%.1f"|format(clean_acc * 100) }}%</td>
+                        <td class="mono">{{ "%.1f"|format(r.recall * 100) }}%</td>
+                        <td class="mono">{{ "%.3f"|format(r.roc_auc) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="field-hint mt-8">
+            <code class="kbd">class_weight='balanced'</code> was not neutral
+            — it was actively worse on nearly every metric. Removing it more
+            than tripled clean-image accuracy and raised ROC-AUC, a
+            threshold-independent improvement in ranking quality. This
+            2-photo finding was treated as a hypothesis, not a conclusion,
+            and re-tested at scale in Experiment D below.
+        </p>
+        {% else %}
+        <div class="alert alert-info">No class_balance_experiment_results.json data found on disk yet.</div>
+        {% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    {# ---------------- Experiment D ---------------- #}
+    <div class="section">
+        <div class="section-head" style="margin-bottom: 14px;">
+            <h2 class="section-title">Experiment D — 9-fold cross-validated primary-model selection</h2>
+            <span class="section-head-rule"></span>
+            <span class="section-actions"><span class="badge badge-neutral">scripts/cross_validate_models.py</span></span>
+        </div>
+        <p class="section-sub">
+            {% if cross_validation %}
+            {{ cross_validation.method }}, pooled across all
+            {{ cross_validation.n_samples }} out-of-fold predictions from
+            {{ cross_validation.n_groups }} source photos. Four model
+            configurations, holding features and split method fixed.
+            {% else %}
+            Leave-one-source-photo-out cross-validation comparing four model
+            configurations.
+            {% endif %}
+        </p>
+
+        {% if cross_validation and cross_validation.results %}
+        {% set cv = cross_validation.results %}
+        <div class="card" style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Configuration</th>
+                        <th>Accuracy</th>
+                        <th>Balanced acc.</th>
+                        <th>Specificity</th>
+                        <th>FPR</th>
+                        <th>Recall</th>
+                        <th>ROC-AUC</th>
+                        <th>PR-AUC</th>
+                        <th>TPR @ FPR≤20%</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for key, label in [('random_forest_balanced', "Random Forest, class_weight='balanced' (former default)"), ('random_forest_unweighted', "Random Forest, class_weight=None"), ('gradient_boosting', "Gradient Boosting"), ('logistic_regression_balanced', "Logistic Regression, class_weight='balanced'")] %}
+                    {% if cv[key] %}
+                    {% set p = cv[key].pooled %}
+                    <tr{% if key == 'random_forest_unweighted' %} class="is-selected"{% endif %}>
+                        <td>{{ label }}{% if key == 'random_forest_unweighted' %} <span class="badge badge-primary">production</span>{% endif %}</td>
+                        <td class="mono">{{ "%.1f"|format(p.accuracy * 100) }}%</td>
+                        <td class="mono">{{ "%.1f"|format(p.balanced_accuracy * 100) }}%</td>
+                        <td class="mono">{{ "%.1f"|format(p.specificity * 100) }}%</td>
+                        <td class="mono">{{ "%.1f"|format(p.false_positive_rate * 100) }}%</td>
+                        <td class="mono">{{ "%.1f"|format(p.recall * 100) }}%</td>
+                        <td class="mono">{{ "%.3f"|format(p.roc_auc) }}</td>
+                        <td class="mono">{{ "%.3f"|format(p.pr_auc) }}</td>
+                        <td class="mono">{{ "%.3f"|format(p.tpr_at_fpr.at_fpr_20) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="field-hint mt-8">
+            Random Forest (<span class="mono">class_weight=None</span>) is
+            the production model, selected on TPR at a ≤20% false-positive
+            budget — this app is a human-in-the-loop triage aid, so the
+            operationally relevant question is how much real signal survives
+            at a false-alarm rate an analyst could tolerate. Gradient
+            Boosting wins on balanced accuracy and specificity instead, and
+            would be the more defensible choice under a symmetric-cost
+            assumption. See the full rationale on the
+            <a href="{{ url_for('pages.model_performance_page') }}">Model page</a>.
+        </p>
+        {% else %}
+        <div class="alert alert-info">No cross_validation_results.json data found on disk yet — run scripts/cross_validate_models.py to populate this section.</div>
+        {% endif %}
+    </div>
+
+    <div class="callout mt-24">
+        <strong>Reading these numbers.</strong> Every table on this page is
+        generated from real runs against a small (9-photo, 960-sample)
+        dataset — not a research-scale corpus like BOSSbase or ALASKA2. The
+        model comparison and payload-detection numbers should be read as
+        evidence about this project's specific pipeline and dataset, not as
+        general claims about LSB steganalysis. Full discussion, including
+        counter-arguments to the model-selection criterion, is in
+        <span class="mono">docs/research-notes.md</span>.
+    </div>
+
+</div>
+</div>
+{% endblock %}

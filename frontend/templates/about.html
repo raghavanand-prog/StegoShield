@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content" style="max-width: 820px;">
+
+    <div class="page-header">
+        <div class="eyebrow">ABOUT</div>
+        <h1 class="page-title">About StegoShield</h1>
+        <p class="page-desc">Why this exists, how it's built, and what it honestly is and isn't.</p>
+    </div>
+
+    <div class="section">
+        <h2 class="section-title-lg">What is steganography?</h2>
+        <p class="text-mid">
+            Steganography is the practice of concealing information within
+            another, non-secret medium (a "cover") so that the existence of
+            the hidden data itself is not obvious — unlike cryptography,
+            which scrambles data so it cannot be <em>read</em> but does not
+            hide the fact that a secret message exists. StegoShield uses
+            <strong>Least Significant Bit (LSB) embedding</strong>: for each
+            colour channel byte, the lowest-order bit is replaced with one
+            bit of the secret payload. Because that bit changes a pixel
+            value by at most 1 out of 255, the modification is imperceptible
+            to the human eye. Full algorithm detail is on the
+            <a href="{{ url_for('pages.docs_page') }}#steganography">Docs page</a>.
+        </p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+        <h2 class="section-title-lg">What is steganalysis?</h2>
+        <p class="text-mid">
+            Steganalysis is the defensive counterpart to steganography: using
+            statistical analysis to determine whether a piece of media
+            <em>likely</em> contains hidden data. LSB embedding, while
+            visually invisible, measurably perturbs the statistical
+            properties of a natural image — it tends to flatten the entropy
+            of the LSB bit-plane toward a uniform 50/50 distribution, and it
+            weakens the correlation between neighbouring pixels that real
+            photographs normally exhibit. StegoShield's steganalysis engine
+            extracts 49 such statistical features and uses a trained Random
+            Forest classifier to estimate the probability that an image was
+            steganographically modified.
+        </p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+        <h2 class="section-title-lg">Why this matters in cybersecurity</h2>
+        <p class="text-mid">
+            Image steganography has legitimate uses (digital watermarking,
+            covert diplomatic/journalistic communication under censorship)
+            but is also a documented technique in real threats: malware
+            families have used steganography to smuggle payloads or
+            command-and-control instructions inside seemingly-benign images
+            to evade network content filters, and it has been used for data
+            exfiltration by hiding sensitive documents inside image uploads.
+            Digital forensics and Security Operations Center (SOC) teams
+            increasingly need automated steganalysis tooling as a triage
+            layer, alongside signature and behavioural detection.
+        </p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+        <h2 class="section-title-lg">Machine learning approach</h2>
+        <p class="text-mid">
+            Rather than deep learning on raw pixels (which needs far more
+            data than this project's small demonstration corpus provides),
+            StegoShield uses classical statistical steganalysis features
+            (channel statistics, entropy, LSB-plane statistics, adjacent-pixel
+            correlation, noise residuals, histogram characteristics, cross-
+            channel correlation) feeding a Random Forest classifier — a
+            well-established, interpretable approach in the steganalysis
+            literature (related to feature families such as SPAM/WAM). The
+            evidence behind that model choice is on the
+            <a href="{{ url_for('pages.experiments_page') }}">Experiments page</a>.
+        </p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+        <h2 class="section-title-lg">Limitations</h2>
+        <p class="text-mid">This is an academic / portfolio prototype, not a production intrusion-detection system:</p>
+        <ul class="text-mid">
+            <li>The training corpus is a small (9-photograph) public-domain sample set, tiled and augmented — not a research-scale corpus such as BOSSbase or ALASKA2.</li>
+            <li>Low embedding rates (below ~10% of capacity) are inherently hard to detect statistically and the model's recall degrades accordingly — a well-documented limitation in the steganalysis literature, not unique to this project.</li>
+            <li>The classifier is format- and pipeline-specific: it was trained against StegoShield's own LSB encoder and may not generalize to other steganography tools or to JPEG-domain steganography.</li>
+            <li>Predictions are probabilistic; both false positives and false negatives are expected and are visible in the <a href="{{ url_for('pages.model_performance_page') }}">Model Performance</a> page's confusion matrix.</li>
+        </ul>
+        <p class="field-hint">Full discussion in <span class="mono">docs/research-notes.md</span>, or the <a href="{{ url_for('pages.docs_page') }}#limitations">Docs page</a>.</p>
+    </div>
+
+    <div class="callout mt-24">
+        <strong>Ethical use.</strong> StegoShield is built for education,
+        cybersecurity research, and defensive-security demonstration. It is
+        not intended, marketed, or optimized to facilitate covert criminal
+        communication. All image processing happens locally within this
+        application — no uploaded image is ever sent to an external service.
+    </div>
+
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+.Python
+build/
+dist/
+
+# Environment
+.env
+*.env.local
+
+# Flask
+instance/
+.flask_session/
+
+# Uploads & temp files (never commit user-uploaded or generated images)
+data/uploads/*
+!data/uploads/.gitkeep
+data/generated/*
+!data/generated/.gitkeep
+data/tmp/*
+!data/tmp/.gitkeep
+*.stego.png
+
+# Datasets (regenerate via scripts/generate_dataset.py, do not commit)
+data/dataset/*
+!data/dataset/.gitkeep
+data/features/*.csv
+
+# Trained models (regenerate via scripts/train_model.py; keep small metadata only)
+ml/models/*.joblib
+ml/models/*.pkl
+!ml/models/.gitkeep
+ml/models/model_card.json
+
+# Logs
+logs/*.log
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
