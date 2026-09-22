@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block topbar_label %}<span class="crumb-prefix">Account</span><span class="crumb-sep">/</span><span class="crumb-active">Dashboard</span>{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content">
+
+    <div class="page-header">
+        <div class="eyebrow">SECURITY ANALYSIS WORKSPACE</div>
+        <h1 class="page-title">Welcome, {{ user.email }}</h1>
+        <p class="page-desc">Your signed-in workspace - account details and analysis history.</p>
+    </div>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Quick actions</h2>
+            <span class="section-head-rule"></span>
+        </div>
+        <div class="hero-actions">
+            <a class="btn btn-primary" href="{{ url_for('pages.steganalysis_page') }}">New Analysis</a>
+            <a class="btn" href="{{ url_for('pages.encode_page') }}">Encode</a>
+            <a class="btn" href="{{ url_for('pages.decode_page') }}">Decode</a>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Account</h2>
+            <span class="section-head-rule"></span>
+        </div>
+        <div class="card">
+            <div class="panel-row"><span class="panel-row-label">Email</span><span class="panel-row-value">{{ user.email }}</span></div>
+            <div class="panel-row"><span class="panel-row-label">Account created</span><span class="panel-row-value">{{ profile.created_at if profile else "—" }}</span></div>
+            <div class="panel-row"><span class="panel-row-label">Last login</span><span class="panel-row-value">{{ profile.last_login if profile and profile.last_login else "—" }}</span></div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="section-head">
+            <h2 class="section-title">Recent analysis</h2>
+            <span class="section-head-rule"></span>
+        </div>
+        {% if recent %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Type</th><th>File</th><th>Result</th><th>Confidence</th></tr>
+                </thead>
+                <tbody>
+                {% for row in recent %}
+                    <tr>
+                        <td>{{ row.created_at }}</td>
+                        <td>{{ row.analysis_type }}</td>
+                        <td>{{ row.filename or "—" }}</td>
+                        <td>{{ row.result or "—" }}</td>
+                        <td>{{ "%.1f%%"|format(row.confidence * 100) if row.confidence is not none else "—" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-dim">No analyses recorded yet - results from Encode, Decode, and Steganalysis appear here once you run one while signed in.</p>
+        {% endif %}
+        <p class="mt-16"><a class="btn" href="{{ url_for('auth.history') }}">View History</a></p>
+    </section>
+
+</div>
+</div>
+{% endblock %}

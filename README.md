@@ -22,7 +22,15 @@ Verified live: `/api/health` returns HTTP 200, the dashboard renders
 with the real trained model's stats, and the encode/steganalysis
 workflows were exercised end-to-end against this URL from outside the
 deployment (see "Production Deployment (Vercel)" for what was tested
-and how).
+and how). No login is required to use any of it.
+
+Authentication (`/login`, `/signup`, `/dashboard`, `/account`,
+`/history`) is fully implemented and unit-tested (see "Authentication"
+below), but this specific deployment has no Supabase project connected
+to it yet, so those pages currently show a plain "not configured"
+message rather than a working login form - setting `SUPABASE_URL` /
+`SUPABASE_ANON_KEY` and running `supabase/schema.sql` turns it on with
+no code changes.
 
 ## Local Development
 
@@ -416,6 +424,104 @@ For a production-style run:
 pip install gunicorn
 FLASK_ENV=production gunicorn "app:create_app()" --bind 0.0.0.0:5000 --workers 2
 ```
+
+## Authentication
+
+StegoShield's core purpose - steganography, decoding, steganalysis,
+image analysis, docs - is deliberately unauthenticated. There is no
+login wall in front of the app: a recruiter clicking the Live Demo
+link lands directly in a fully working workspace. Authentication is an
+additional, opt-in layer that adds identity, session management,
+authorization, and a per-user analysis history on top of that.
+
+**Provider: Supabase Auth + Postgres**, chosen because the app had no
+existing auth/database infrastructure at all - confirmed by inspecting
+the repo before writing any of this (no `SQLAlchemy`, no session
+store, no user table). Supabase gives real password hashing, email
+verification, and a Postgres database with Row Level Security, without
+this app ever handling or storing a raw password.
+
+**How it's wired in** (`app/auth/`): rather than the `supabase-py` SDK
+(which pulls in `gotrue`/`postgrest`/`realtime`/`storage3`/
+`websockets` - meaningful extra weight in an already size-constrained
+Vercel Python bundle), the app talks to Supabase's Auth and PostgREST
+HTTP APIs directly via `requests` (`app/auth/supabase_client.py`). Flask
+stays the only framework - no separate frontend, no new build step.
+
+- **Sign up** (`/signup`): email + password + confirm, server-side
+  password policy (8+ chars, a letter and a number) and email-format
+  validation before ever calling Supabase, duplicate-email and
+  invalid-input errors shown as clear, safe messages (never the raw
+  provider error string - see `tests/test_auth.py::test_duplicate_email_shows_safe_message`).
+  If the Supabase project has email confirmation enabled, the user is
+  told to check their inbox instead of being signed in immediately.
+- **Sign in** (`/login`): on success, the app stores the Supabase
+  access token, refresh token, expiry, user id and email in Flask's
+  signed session cookie - never in `localStorage` or client-side JS.
+  `SESSION_COOKIE_HTTPONLY=True`, `SESSION_COOKIE_SAMESITE=Lax`, and
+  `SESSION_COOKIE_SECURE=True` in production (see `app/config.py`).
+  The cookie is signed, not encrypted, but the only thing in it is a
+  user's own token, not a server secret - HttpOnly/Secure/SameSite is
+  what actually stops another party from reading or replaying it.
+- **Session refresh**: `app/auth/decorators.py::get_current_user()`
+  transparently refreshes the Supabase access token via its refresh
+  token when it's about to expire, so a signed-in user doesn't get
+  logged out every hour; a refresh failure clears the session and
+  sends them back to `/login`.
+- **CSRF**: every state-changing form (login, signup, logout) submits
+  a per-session token minted by `app/auth/decorators.py::get_csrf_token()`
+  and checked with a constant-time comparison before anything happens.
+- **Rate limiting**: `/login` and `/signup` are limited via
+  Flask-Limiter (`RATE_LIMIT_AUTH`, default 5/minute) against
+  brute-force and account-creation abuse - same in-memory-per-instance
+  caveat as the rest of the app's rate limiting (see "Production
+  Deployment" limitations below).
+- **Authorization / IDOR prevention**: `/dashboard`, `/account`,
+  `/history`, and `/history/<id>` all require `@login_required`. More
+  importantly, every database read/write runs as the signed-in user -
+  using *their* access token as the PostgREST `Authorization` header,
+  never a service-role key - so Postgres Row Level Security
+  (`supabase/schema.sql`) is what actually enforces "you can only see
+  your own rows," not application code. Visiting another user's
+  `/history/<id>` returns the same 404 as a nonexistent ID, by design:
+  the app can't tell the two cases apart, which is exactly what
+  prevents ID enumeration. Verified in `tests/test_auth.py::TestHistoryIsolation`.
+- **What's stored**: `profiles` (id, email, created_at, last_login) and
+  `analysis_history` (user id, timestamp, analysis type, filename,
+  result, confidence, model version) - see `supabase/schema.sql`.
+  **No uploaded image bytes are ever stored** in either table, in
+  Supabase, or anywhere else; the existing temp-file handling
+  (`app/security/file_handler.py`) is unchanged, and history rows are
+  written only after a request already succeeded.
+
+**Environment variables** (see `.env.example`):
+
+| Variable | Required | Notes |
+|---|---|---|
+| `SUPABASE_URL` | For auth features only | Project URL from Supabase Settings → API |
+| `SUPABASE_ANON_KEY` | For auth features only | The `anon`/`public` key - safe to use server-side; still an env var, never hardcoded |
+| `SESSION_COOKIE_SECURE` | No | Defaults to `True` outside debug mode |
+| `PERMANENT_SESSION_LIFETIME_DAYS` | No | Default 7 |
+| `RATE_LIMIT_AUTH` | No | Default `5 per minute` |
+
+Leaving `SUPABASE_URL`/`SUPABASE_ANON_KEY` unset disables auth
+entirely and safely: `/login` and `/signup` show a plain "not
+configured" message instead of erroring, and every public route is
+completely unaffected (`Config.AUTH_ENABLED` gates all of it - see
+`tests/test_auth.py::TestPublicRoutesUnaffected`). **A service-role
+key is never used by this app and should never be set anywhere** - see
+`supabase/schema.sql`'s comment on why RLS + the user's own token makes
+it unnecessary.
+
+**Setting it up**: create a Supabase project, run `supabase/schema.sql`
+once in its SQL Editor, then set `SUPABASE_URL`/`SUPABASE_ANON_KEY` as
+environment variables on the deployment (e.g. Vercel Project Settings
+→ Environment Variables) and redeploy.
+
+**Known limitation**: "Forgot password" is shown in the UI as
+explicitly not implemented in this demo, rather than as a working link
+that silently does nothing - honest incompleteness over a fake
+affordance.
 
 ## Production Deployment (Vercel)
 

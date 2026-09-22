@@ -1,6 +1,8 @@
 """Flask application factory for StegoShield."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 from flask import Flask, jsonify, render_template, request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -27,6 +29,7 @@ def create_app() -> Flask:
     )
     app.config.from_object(config_cls)
     app.config["MAX_CONTENT_LENGTH"] = config_cls.MAX_CONTENT_LENGTH
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=config_cls.PERMANENT_SESSION_LIFETIME_DAYS)
 
     limiter.init_app(app)
     if not config_cls.RATE_LIMIT_ENABLED:
@@ -37,17 +40,41 @@ def create_app() -> Flask:
     _register_blueprints(app)
     _register_error_handlers(app)
     _register_security_headers(app)
+    _register_template_globals(app)
 
     logger.info("app_started", extra={"debug": app.config.get("DEBUG", False)})
     return app
 
 
 def _register_blueprints(app: Flask) -> None:
+    from app.auth.routes import auth_bp
     from app.routes.api import api_bp
     from app.routes.pages import pages_bp
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(auth_bp)
+
+
+def _register_template_globals(app: Flask) -> None:
+    from flask import current_app
+
+    from app.auth.decorators import get_csrf_token, get_current_user
+
+    @app.context_processor
+    def inject_auth_context():
+        # Best-effort: a template render should never 500 because the
+        # auth session lookup failed or Supabase is unreachable.
+        auth_enabled = current_app.config["AUTH_ENABLED"]
+        try:
+            current_user = get_current_user() if auth_enabled else None
+        except Exception:  # noqa: BLE001 - defensive, see docstring above
+            current_user = None
+        # get_csrf_token() only touches the session (no network call), so
+        # it's cheap enough to compute on every render - it's what the
+        # logout form (rendered on every page once signed in) submits.
+        csrf_token = get_csrf_token() if current_user else None
+        return {"current_user": current_user, "auth_enabled": auth_enabled, "global_csrf_token": csrf_token}
 
 
 def _register_security_headers(app: Flask) -> None:
@@ -130,6 +157,12 @@ def _register_error_handlers(app: Flask) -> None:
             ),
             429,
         )
+
+    @app.errorhandler(404)
+    def handle_not_found(err):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": {"code": "not_found", "message": "Not found."}}), 404
+        return render_template("errors/404.html"), 404
 
     @app.errorhandler(HTTPException)
     def handle_http_exception(err: HTTPException):

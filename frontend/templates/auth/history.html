@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Analysis History{% endblock %}
+{% block topbar_label %}<span class="crumb-prefix">Account</span><span class="crumb-sep">/</span><span class="crumb-active">History</span>{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content">
+
+    <div class="page-header">
+        <div class="eyebrow">ACCOUNT</div>
+        <h1 class="page-title">Analysis History</h1>
+        <p class="page-desc">Only visible to you - enforced by database row-level security, not just application logic.</p>
+    </div>
+
+    {% if records %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Type</th><th>File</th><th>Result</th><th>Confidence</th><th></th></tr>
+            </thead>
+            <tbody>
+            {% for row in records %}
+                <tr>
+                    <td>{{ row.created_at }}</td>
+                    <td>{{ row.analysis_type }}</td>
+                    <td>{{ row.filename or "—" }}</td>
+                    <td>{{ row.result or "—" }}</td>
+                    <td>{{ "%.1f%%"|format(row.confidence * 100) if row.confidence is not none else "—" }}</td>
+                    <td><a class="btn btn-sm" href="{{ url_for('auth.history_detail', record_id=row.id) }}">Details</a></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-dim">No analyses recorded yet - results from Encode, Decode, and Steganalysis appear here once you run one while signed in.</p>
+    {% endif %}
+
+</div>
+</div>
+{% endblock %}

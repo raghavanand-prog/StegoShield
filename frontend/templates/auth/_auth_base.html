@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sign In{% endblock %} · StegoShield</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230a0c10'/%3E%3Crect x='3' y='3' width='4' height='4' fill='%2360a5fa'/%3E%3Crect x='9' y='3' width='4' height='4' fill='%239aa2b8'/%3E%3Crect x='3' y='9' width='4' height='4' fill='%239aa2b8'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%233b82f6'/%3E%3C/svg%3E">
+</head>
+<body class="auth-body">
+<div class="auth-shell">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <span class="auth-brand-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="3" y="3" width="8" height="8" rx="1.5" fill="currentColor" opacity="0.55"/>
+                    <rect x="13" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                    <rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+                    <rect x="13" y="13" width="8" height="8" rx="1.5" fill="currentColor"/>
+                </svg>
+            </span>
+            <span class="auth-brand-name">STEGO SHIELD</span>
+        </div>
+        <p class="auth-tagline">{% block tagline %}Secure access to your analysis workspace.{% endblock %}</p>
+
+        {% block auth_content %}{% endblock %}
+
+        <a class="auth-guest-link" href="{{ url_for('pages.dashboard') }}">Continue as Guest</a>
+    </div>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

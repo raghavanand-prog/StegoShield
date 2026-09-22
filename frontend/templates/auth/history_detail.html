@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Analysis Detail{% endblock %}
+{% block topbar_label %}<span class="crumb-prefix">Account</span><span class="crumb-sep">/</span><span class="crumb-active">History</span>{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content" style="max-width: 640px;">
+
+    <div class="page-header">
+        <div class="eyebrow">ACCOUNT</div>
+        <h1 class="page-title">Analysis Detail</h1>
+    </div>
+
+    <div class="card">
+        <div class="panel-row"><span class="panel-row-label">Date</span><span class="panel-row-value">{{ record.created_at }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">Type</span><span class="panel-row-value">{{ record.analysis_type }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">File</span><span class="panel-row-value">{{ record.filename or "—" }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">Result</span><span class="panel-row-value">{{ record.result or "—" }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">Confidence</span><span class="panel-row-value">{{ "%.1f%%"|format(record.confidence * 100) if record.confidence is not none else "—" }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">Model version</span><span class="panel-row-value">{{ record.model_version or "—" }}</span></div>
+    </div>
+
+    <p class="mt-24"><a class="btn" href="{{ url_for('auth.history') }}">Back to History</a></p>
+
+</div>
+</div>
+{% endblock %}
