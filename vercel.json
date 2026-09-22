@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python build_vercel.py",
   "functions": {
-    "wsgi.py": {
+    "main.py": {
       "maxDuration": 60,
-      "memory": 2048,
       "excludeFiles": "{tests/**,docs/screenshots/**,scripts/**,ml/dataset/**,ml/training/**,ml/evaluation/**,ml/features/**,data/dataset/**,data/generated/**,data/tmp/**,.git/**,venv/**,venv_check/**}"
     }
   }
