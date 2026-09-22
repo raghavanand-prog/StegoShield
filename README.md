@@ -16,19 +16,20 @@ inside one working application.
 
 ## Live Demo
 
-https://stegoshield-two.vercel.app *(being migrated to Render - see below)*
+https://stegoshield-5b8r.onrender.com
 
-**Status note (kept honest rather than quietly edited away):** this
-Vercel deployment works most of the time, but real production traffic
-surfaced intermittent 500s on cold-start requests from some regions -
-root-caused to a genuine Vercel Python-runtime limitation (see
-"Production Deployment (Vercel)"), not a bug in the app itself. The
-project is being moved to Render, which runs a persistent Docker
-container and doesn't have this failure mode - see "Production
-Deployment (Render)" for the current, more reliable target. This URL
-will be updated once that migration is verified end-to-end.
+Verified live from outside the deployment (a separate compute sandbox,
+not the app's own network): `/api/health` → 200, homepage → 200, a
+real image through `/api/encode` → `/api/decode` recovers the exact
+original message, `/api/steganalysis` returns a genuine model
+prediction, `/api/image-analysis` returns real MSE/PSNR/SSIM +
+visual-diff output, a non-image upload → 400, a 12MB upload against
+the real 10MB limit → 413, a request with no file → 400. No login is
+required to use any of it.
 
-No login is required to use any of it, on either platform.
+*A previous Vercel deployment (`stegoshield-two.vercel.app`) is kept
+running but superseded - see "Production Deployment (Vercel)" for why
+it was replaced.*
 
 Authentication (`/login`, `/signup`, `/dashboard`, `/account`,
 `/history`) is fully implemented and unit-tested (see "Authentication"
@@ -568,10 +569,26 @@ same way, since Render's containers don't churn per-request like
 serverless functions do; a proper Gunicorn production server instead
 of a platform-specific WSGI adapter.
 
-**Known limitation**: Render's free tier spins the container down
-after a period of inactivity, so the first request after idle time
-will be slow (cold start of the whole container, including reloading
-the ML stack) - a real tradeoff of the free tier, not hidden here.
+**Verified live** from outside the deployment: `GET /api/health` → 200,
+`GET /` → 200, a real image through `POST /api/encode` →
+`POST /api/decode` recovers the exact original message,
+`POST /api/steganalysis` returns a genuine model prediction,
+`POST /api/image-analysis` returns real quality/visual-diff output, a
+non-image upload → 400, a 12MB upload → 413 (the real 10MB limit, not
+Vercel's reduced 2MB), a request with no file → 400.
+
+**Known limitations** (stated plainly):
+- Render's free tier spins the container down after a period of
+  inactivity, so the first request after idle time will be slow (cold
+  start of the whole container, including reloading the ML stack).
+- Gunicorn's `--workers 2` means Flask-Limiter's default in-memory
+  rate-limit counter is per-worker-process, not global to the
+  container - observed directly: a 15-request burst to
+  `/api/steganalysis` all returned 200 instead of tripping
+  `RATE_LIMIT_UPLOAD` (10/minute) partway through, because traffic
+  split across two counters. A shared store (Redis) would give a true
+  global limit; out of scope for a portfolio deployment, and noted
+  here rather than left for someone to discover.
 
 ## Production Deployment (Vercel)
 
