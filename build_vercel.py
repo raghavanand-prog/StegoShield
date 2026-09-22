@@ -28,6 +28,11 @@ def run(cmd: list[str]) -> None:
 
 
 def main() -> None:
+    # Explicit and self-contained rather than relying on Vercel's
+    # implicit "install requirements.txt" step still running alongside
+    # a custom top-level `buildCommand` (vercel.json) - this way the
+    # build works the same regardless of that platform behavior.
+    run([sys.executable, "-m", "pip", "install", "--no-cache-dir", "-r", "requirements.txt"])
     run([sys.executable, "scripts/generate_dataset.py"])
     run([sys.executable, "scripts/train_model.py"])
 
