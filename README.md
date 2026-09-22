@@ -578,17 +578,30 @@ non-image upload → 400, a 12MB upload → 413 (the real 10MB limit, not
 Vercel's reduced 2MB), a request with no file → 400.
 
 **Known limitations** (stated plainly):
-- Render's free tier spins the container down after a period of
-  inactivity, so the first request after idle time will be slow (cold
-  start of the whole container, including reloading the ML stack).
-- Gunicorn's `--workers 2` means Flask-Limiter's default in-memory
-  rate-limit counter is per-worker-process, not global to the
-  container - observed directly: a 15-request burst to
-  `/api/steganalysis` all returned 200 instead of tripping
-  `RATE_LIMIT_UPLOAD` (10/minute) partway through, because traffic
-  split across two counters. A shared store (Redis) would give a true
-  global limit; out of scope for a portfolio deployment, and noted
-  here rather than left for someone to discover.
+- Render's free tier spins the container down after ~15 minutes of no
+  inbound traffic, so the first request after idle time can be slow or
+  briefly show a 502 while it restarts. A free external uptime monitor
+  (e.g. UptimeRobot) pinging `/api/health` every 5 minutes keeps the
+  container warm and avoids this - set up on this deployment.
+- **A second, more serious 502 cause was found and fixed**: Render's
+  free tier caps memory at 512MB. Gunicorn's original `--workers 2`
+  meant numpy/scipy/scikit-learn/scikit-image/matplotlib were each
+  fully imported *twice* (once per worker process), and real requests
+  (encode/decode/steganalysis, not just the lightweight health check)
+  pushed the container over that limit - Render OOM-killed and
+  restarted it, which is what the 502s during actual use were. Fixed
+  by dropping to `--workers 1` in the Dockerfile. This serializes
+  requests (fine for a low-traffic portfolio demo) - on a paid Render
+  plan with more RAM, that can go back up.
+- Gunicorn's (now single) worker still means Flask-Limiter's default
+  in-memory rate-limit counter isn't shared across multiple worker
+  processes if this is ever scaled back up - observed directly with
+  `--workers 2`: a 15-request burst to `/api/steganalysis` all
+  returned 200 instead of tripping `RATE_LIMIT_UPLOAD` (10/minute)
+  partway through, because traffic split across two counters. A shared
+  store (Redis) would give a true global limit; out of scope for a
+  portfolio deployment, and noted here rather than left for someone to
+  discover.
 
 ## Production Deployment (Vercel)
 

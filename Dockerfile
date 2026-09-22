@@ -43,8 +43,20 @@ RUN useradd --create-home --uid 1000 stego && chown -R stego:stego /app
 USER stego
 
 # Render (and most PaaS platforms) inject PORT at runtime; never
-# hardcode 5000 here. --workers 2 matches the README's documented
-# production command; --timeout 60 gives room for the largest
-# image-analysis/steganalysis requests.
+# hardcode 5000 here.
+#
+# --workers 1: this is not a general recommendation, it's sized for
+# Render's free tier specifically (512MB RAM / 0.1 CPU - confirmed via
+# a real production failure: 2 workers each fully import numpy/scipy/
+# scikit-learn/scikit-image/matplotlib, and that alone was enough to
+# exceed 512MB under real request load, causing Render to OOM-kill and
+# restart the container - which surfaced as intermittent 502s on
+# encode/decode/steganalysis, not on lightweight requests like /api/health).
+# One worker halves that baseline import cost. It serializes requests
+# (fine for a low-traffic portfolio demo, not fine for real concurrent
+# load) - on a paid Render plan with more RAM, raise this back up.
+# --timeout 120 gives headroom for the largest image-analysis/
+# steganalysis requests now that they queue behind each other instead
+# of running in parallel.
 EXPOSE 8000
-CMD ["sh", "-c", "gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 60"]
+CMD ["sh", "-c", "gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout 120"]
