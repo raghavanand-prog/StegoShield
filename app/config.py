@@ -78,6 +78,26 @@ class Config:
     )
     MAX_MESSAGE_BYTES = 5 * 1024 * 1024  # hard ceiling regardless of image capacity
 
+    # --- Authentication (Supabase Auth + Postgres) ---------------------------
+    # Optional: the public demo (encode/decode/analysis) works with none of
+    # these set. Only /login, /signup and the authenticated area
+    # (/dashboard, /account, /history) need them - see
+    # app/auth/supabase_client.py. Never put the service-role key here or
+    # in any client-facing code; it is not used by this app at all (every
+    # authenticated request uses the signed-in user's own access token, so
+    # Postgres Row Level Security enforces per-user isolation - see
+    # supabase/schema.sql).
+    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+    AUTH_ENABLED = bool(SUPABASE_URL and SUPABASE_ANON_KEY)
+
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = _bool("SESSION_COOKIE_SECURE", not DEBUG)
+    PERMANENT_SESSION_LIFETIME_DAYS = int(os.getenv("PERMANENT_SESSION_LIFETIME_DAYS", "7"))
+
+    RATE_LIMIT_AUTH = os.getenv("RATE_LIMIT_AUTH", "5 per minute")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -91,6 +111,13 @@ class TestingConfig(Config):
     TESTING = True
     RATE_LIMIT_ENABLED = False
     UPLOAD_TEMP_DIR = BASE_DIR / "data" / "tmp_test"
+    # Dummy values so auth routes are reachable in tests; every outbound
+    # Supabase HTTP call is mocked in tests/test_auth.py - nothing here
+    # ever makes a real network request.
+    SUPABASE_URL = "https://test-project.supabase.co"
+    SUPABASE_ANON_KEY = "test-anon-key"
+    AUTH_ENABLED = True
+    SESSION_COOKIE_SECURE = False
 
 
 CONFIG_MAP = {

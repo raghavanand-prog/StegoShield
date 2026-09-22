@@ -1,0 +1,70 @@
+{% extends "auth/_auth_base.html" %}
+{% block title %}Create Account{% endblock %}
+{% block tagline %}Create an account to save your analysis history.{% endblock %}
+{% block auth_content %}
+
+{% if error %}<div class="auth-alert auth-alert-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="auth-alert auth-alert-success">{{ success }}</div>{% endif %}
+
+{% if auth_disabled %}
+    <div class="auth-alert auth-alert-error">Authentication isn't configured on this deployment. See README "Authentication".</div>
+{% elif not success %}
+<form method="post" action="{{ url_for('auth.signup_submit') }}" class="auth-form" id="signup-form" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="text" id="email" name="email" autocomplete="email" required>
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="new-password" minlength="8" required>
+        <p class="field-hint">At least 8 characters, with a letter and a number.</p>
+    </div>
+    <div class="form-group">
+        <label for="confirm_password">Confirm Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" required>
+    </div>
+    <p class="field-hint auth-form-error" id="signup-client-error" hidden></p>
+
+    <button type="submit" class="btn btn-primary btn-block auth-submit" id="signup-submit">Create Account</button>
+</form>
+
+<div class="auth-switch">
+    Already have an account? <a href="{{ url_for('auth.login') }}">Sign In</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    var form = document.getElementById("signup-form");
+    if (!form) return;
+    var errorEl = document.getElementById("signup-client-error");
+    var submitBtn = document.getElementById("signup-submit");
+
+    function issue(password, confirm) {
+        if (password.length < 8) return "Password must be at least 8 characters.";
+        if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return "Password must include a letter and a number.";
+        if (password !== confirm) return "Passwords do not match.";
+        return null;
+    }
+
+    form.addEventListener("submit", function (e) {
+        var password = document.getElementById("password").value;
+        var confirm = document.getElementById("confirm_password").value;
+        var problem = issue(password, confirm);
+        if (problem) {
+            e.preventDefault();
+            errorEl.textContent = problem;
+            errorEl.hidden = false;
+        } else {
+            errorEl.hidden = true;
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Creating account…";
+        }
+    });
+})();
+</script>
+{% endblock %}

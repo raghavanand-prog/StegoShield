@@ -63,11 +63,24 @@
                 <a href="{{ url_for('pages.docs_page') }}" class="nav-item {{ 'active' if active_page == 'docs' }}" {% if active_page == 'docs' %}aria-current="page"{% endif %}>Documentation</a>
                 <a href="{{ url_for('pages.about_page') }}" class="nav-item {{ 'active' if active_page == 'about' }}" {% if active_page == 'about' %}aria-current="page"{% endif %}>About</a>
             </div>
+
+            {% if auth_enabled %}
+            <div class="nav-group">
+                <div class="nav-group-label">Account</div>
+                {% if current_user %}
+                <a href="{{ url_for('auth.dashboard') }}" class="nav-item {{ 'active' if active_page == 'auth_dashboard' }}">Dashboard</a>
+                <a href="{{ url_for('auth.account') }}" class="nav-item {{ 'active' if active_page == 'auth_account' }}">Account</a>
+                <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ global_csrf_token }}"><button type="submit" class="nav-item nav-item-btn">Logout</button></form>
+                {% else %}
+                <a href="{{ url_for('auth.login') }}" class="nav-item">Login</a>
+                {% endif %}
+            </div>
+            {% endif %}
         </nav>
 <div class="sidebar-footer">
             <span class="privacy-note">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2 2.5 4v4c0 3.4 2.3 6 5.5 6s5.5-2.6 5.5-6V4L8 2z" stroke="currentColor" stroke-width="1.2"/><path d="M6 8l1.5 1.5L10.5 6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                All processing is local.
+                Processed server-side; uploads aren't retained.
             </span>
         </div>
     </aside>
@@ -91,7 +104,7 @@
         </main>
 
         <footer class="site-footer">
-            <span>StegoShield · processed locally, never sent to a third party.</span>
+            <span>StegoShield · processed on this server, never sent to a third party.</span>
             <span class="footer-links">
                 <a href="{{ url_for('pages.docs_page') }}">Documentation</a>
                 <a href="{{ url_for('pages.about_page') }}">About</a>

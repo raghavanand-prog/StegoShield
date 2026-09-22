@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block topbar_label %}<span class="crumb-prefix">Account</span><span class="crumb-sep">/</span><span class="crumb-active">Account</span>{% endblock %}
+{% block content %}
+<div class="page-wrap">
+<div class="content" style="max-width: 640px;">
+
+    <div class="page-header">
+        <div class="eyebrow">ACCOUNT</div>
+        <h1 class="page-title">Account</h1>
+    </div>
+
+    <div class="card">
+        <div class="panel-row"><span class="panel-row-label">Email</span><span class="panel-row-value">{{ user.email }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">Account created</span><span class="panel-row-value">{{ profile.created_at if profile else "—" }}</span></div>
+        <div class="panel-row"><span class="panel-row-label">Last login</span><span class="panel-row-value">{{ profile.last_login if profile and profile.last_login else "—" }}</span></div>
+    </div>
+
+    <div class="callout mt-24">
+        Password changes and profile edits aren't implemented in this
+        demo. Sign-up, sign-in, session management, and per-user
+        analysis history (with database-enforced isolation) are real and
+        fully functional - see the README's "Authentication" section for
+        what this demonstrates and what's intentionally out of scope.
+    </div>
+
+    <form method="post" action="{{ url_for('auth.logout') }}" class="mt-24">
+        <input type="hidden" name="csrf_token" value="{{ global_csrf_token }}">
+        <button type="submit" class="btn btn-primary">Log Out</button>
+    </form>
+
+</div>
+</div>
+{% endblock %}
