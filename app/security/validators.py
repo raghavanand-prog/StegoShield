@@ -26,6 +26,13 @@ import re
 from dataclasses import dataclass, field
 
 import numpy as np
+
+# pylibmagic bundles libmagic's shared library + signature database and
+# patches ctypes.CDLL to resolve to them - required on platforms (e.g.
+# Vercel's serverless Python runtime) that don't have the system
+# libmagic package installed. Must be imported before `magic`. It is a
+# no-op wherever a system libmagic is already present.
+import pylibmagic  # noqa: F401,E402
 import magic
 from PIL import Image
 
