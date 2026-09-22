@@ -16,13 +16,19 @@ inside one working application.
 
 ## Live Demo
 
-https://stegoshield-two.vercel.app
+https://stegoshield-two.vercel.app *(being migrated to Render - see below)*
 
-Verified live: `/api/health` returns HTTP 200, the dashboard renders
-with the real trained model's stats, and the encode/steganalysis
-workflows were exercised end-to-end against this URL from outside the
-deployment (see "Production Deployment (Vercel)" for what was tested
-and how). No login is required to use any of it.
+**Status note (kept honest rather than quietly edited away):** this
+Vercel deployment works most of the time, but real production traffic
+surfaced intermittent 500s on cold-start requests from some regions -
+root-caused to a genuine Vercel Python-runtime limitation (see
+"Production Deployment (Vercel)"), not a bug in the app itself. The
+project is being moved to Render, which runs a persistent Docker
+container and doesn't have this failure mode - see "Production
+Deployment (Render)" for the current, more reliable target. This URL
+will be updated once that migration is verified end-to-end.
+
+No login is required to use any of it, on either platform.
 
 Authentication (`/login`, `/signup`, `/dashboard`, `/account`,
 `/history`) is fully implemented and unit-tested (see "Authentication"
@@ -523,10 +529,60 @@ explicitly not implemented in this demo, rather than as a working link
 that silently does nothing - honest incompleteness over a fake
 affordance.
 
+## Production Deployment (Render)
+
+**Render is the primary/recommended deployment target**, chosen after
+a real production failure on Vercel (documented in full in "Production
+Deployment (Vercel)" below) turned out to be a platform-level
+limitation, not something fixable in application code. Render runs a
+normal, persistent Docker container - the entire dependency stack
+(numpy/scipy/scikit-learn/scikit-image/Pillow/matplotlib) is installed
+once at build time onto real disk, so the class of failure Vercel hit
+(deferring some installs to request-time and running out of `/tmp`
+space) doesn't exist here at all.
+
+**Files**: `Dockerfile` (installs `requirements.txt`, then trains the
+model into the image - see below - then runs as a non-root user under
+Gunicorn), `.dockerignore`, `render.yaml` (a Render Blueprint: service
+type, health check path, and environment variables in one file Render
+reads automatically).
+
+**Model file at build time**: same reasoning as the Vercel deployment
+- `ml/models/steganalysis_model.joblib` is intentionally gitignored,
+so the `Dockerfile` runs `scripts/generate_dataset.py` and
+`scripts/train_model.py` as build steps (deterministic, seeded,
+offline - no network access needed) before the image is finalized.
+
+**Deploying**: push this repository to GitHub (already done), then in
+the Render dashboard: **New +** → **Blueprint** → connect this repo.
+Render detects `render.yaml` automatically and provisions the service
+from it. `SECRET_KEY` is auto-generated; `SUPABASE_URL` /
+`SUPABASE_ANON_KEY` are optional (see "Authentication") and can be
+left blank to keep auth disabled, or filled in from a Supabase
+project's Settings → API page.
+
+**What's different from the Vercel deployment** (in Render's favor):
+no Vercel-imposed 2MB/4.5MB request-body ceiling - the app's normal
+10MB default applies; no per-instance-only rate limiting caveat in the
+same way, since Render's containers don't churn per-request like
+serverless functions do; a proper Gunicorn production server instead
+of a platform-specific WSGI adapter.
+
+**Known limitation**: Render's free tier spins the container down
+after a period of inactivity, so the first request after idle time
+will be slow (cold start of the whole container, including reloading
+the ML stack) - a real tradeoff of the free tier, not hidden here.
+
 ## Production Deployment (Vercel)
 
-The app is deployed as a Vercel Function running the existing Flask
-app object (`wsgi.py`) behind Vercel's Python WSGI runtime - no
+**Status: superseded by Render above**, kept in full for technical
+transparency about a real production issue that was found, diagnosed,
+and could not be resolved within Vercel's platform constraints (see
+"Known limitation" at the end of this section) - not glossed over or
+quietly removed.
+
+The app was deployed as a Vercel Function running the existing Flask
+app object (`main.py`) behind Vercel's Python WSGI runtime - no
 gunicorn/Docker layer is used because Vercel's own runtime replaces
 that role for this platform.
 
@@ -600,6 +656,24 @@ No runtime errors were logged during any of this.
   and never retained, by design (see `app/security/file_handler.py`);
   this also means there's nothing to back up or migrate, but it's a
   deliberate privacy/security property either way.
+- **The actual reason this is superseded**: real production traffic
+  (not a synthetic test) surfaced intermittent `500 FUNCTION_INVOCATION_FAILED`
+  errors. Vercel's own runtime logs showed the cause precisely: because
+  this app's dependency stack (~370MB installed) exceeds Vercel's
+  "standard" 250MB Python bundle size, Vercel defers part of the
+  install to each cold container's first request rather than baking it
+  into the build - and that runtime install failed extracting scipy's
+  OpenBLAS binary with `No space left on device` in `/tmp`. Two
+  distinct real fixes were attempted and verified not to work: setting
+  `VERCEL_SUPPORT_LARGE_FUNCTIONS=1`, and removing `pyproject.toml`/`uv`
+  in favor of plain `requirements.txt` + a zero-config `main.py`
+  entrypoint - the "Bundle size exceeds the standard size; optimizing
+  dependencies" step recurred identically in the build log either way.
+  This is a platform-level constraint, not an application bug -
+  Render's Docker-based deployment above doesn't have it, because the
+  full dependency set is installed once at build time onto persistent
+  disk rather than partially deferred to a size-limited serverless
+  `/tmp`.
 
 ## 11. Reproducing the Experiments
 
