@@ -16,10 +16,13 @@ inside one working application.
 
 ## Live Demo
 
-https://YOUR-DEPLOYED-URL
+https://stegoshield-two.vercel.app
 
-*(Placeholder until the deployment below is live-tested and confirmed
-returning HTTP 200 - see "Production Deployment (Vercel)" for status.)*
+Verified live: `/api/health` returns HTTP 200, the dashboard renders
+with the real trained model's stats, and the encode/steganalysis
+workflows were exercised end-to-end against this URL from outside the
+deployment (see "Production Deployment (Vercel)" for what was tested
+and how).
 
 ## Local Development
 
@@ -462,6 +465,17 @@ Variables): `FLASK_ENV=production`, `DEBUG=False`, `SECRET_KEY`
 `UPLOAD_TEMP_DIR=/tmp/stegoshield`, `LOG_FILE=/tmp/stegoshield-logs/app.log`,
 `MAX_CONTENT_LENGTH_MB=2`. See `.env.example` for the full list and
 local-development defaults.
+
+**What was actually verified against the live URL** (from outside the
+deployment - a separate Vercel Sandbox, not the app's own network):
+`GET /api/health` → 200; `GET /` renders with the real trained model's
+live stats; `POST /api/steganalysis` and `POST /api/encode` against a
+real image → 200 with genuine model/encoding output; a non-image
+upload → 400 (`invalid_image`, correctly content-sniffed); a 3MB
+upload against the 2MB cap → 413; a request with no file → 400
+(`missing_file`); 15 rapid requests to `/api/steganalysis` → the first
+several succeeded, the rest got 429 once `RATE_LIMIT_UPLOAD` was hit.
+No runtime errors were logged during any of this.
 
 **Known limitations of this deployment** (stated plainly, not hidden):
 - **Per-instance rate limiting.** Flask-Limiter's default in-memory
