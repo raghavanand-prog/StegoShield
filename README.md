@@ -14,6 +14,19 @@ detect whether an image likely contains a hidden payload — pairing the
 offensive technique with its defensive counterpart, steganalysis,
 inside one working application.
 
+## Live Demo
+
+https://YOUR-DEPLOYED-URL
+
+*(Placeholder until the deployment below is live-tested and confirmed
+returning HTTP 200 - see "Production Deployment (Vercel)" for status.)*
+
+## Local Development
+
+```bash
+python run.py
+```
+
 ![Dashboard](docs/screenshots/01_dashboard.png)
 
 ---
@@ -400,6 +413,73 @@ For a production-style run:
 pip install gunicorn
 FLASK_ENV=production gunicorn "app:create_app()" --bind 0.0.0.0:5000 --workers 2
 ```
+
+## Production Deployment (Vercel)
+
+The app is deployed as a Vercel Function running the existing Flask
+app object (`wsgi.py`) behind Vercel's Python WSGI runtime - no
+gunicorn/Docker layer is used because Vercel's own runtime replaces
+that role for this platform.
+
+**Why Vercel, given the ML dependency stack.** The audit before this
+deployment measured the runtime install (`numpy` + `scipy` +
+`scikit-learn` + `scikit-image` + `Pillow` + `matplotlib` + `joblib`)
+at ~460MB, over the generic 250MB Vercel Function limit but under
+Python's own 500MB allowance, and comfortably under the 5GB "Fluid
+Compute large functions" ceiling that new Vercel projects get
+automatically. Three platform-specific changes were required to make
+the existing app run unmodified in behavior:
+
+1. **Model file at build time.** `ml/models/steganalysis_model.joblib`
+   is intentionally gitignored (kept out of the repo as a binary
+   artifact). `build_vercel.py` runs
+   `scripts/generate_dataset.py` + `scripts/train_model.py`
+   (`pyproject.toml`'s `[tool.vercel.scripts] build`) before Vercel
+   packages the function, so the trained model exists on disk before
+   the app starts. Both scripts are seeded (42) and use scikit-image's
+   *bundled* sample images, so this is deterministic and needs no
+   network access during the build.
+2. **`python-magic` needs system `libmagic`,** which Vercel's Python
+   runtime doesn't ship. Added `pylibmagic` (bundles the shared
+   library + signature database) and one import line in
+   `app/security/validators.py` - the content-sniffing security check
+   itself is unchanged.
+3. **Filesystem + request-size limits**, both handled purely through
+   environment variables, no code changes:
+   - `UPLOAD_TEMP_DIR=/tmp/stegoshield` - the deployed source tree is
+     read-only except `/tmp`.
+   - `LOG_FILE=/tmp/stegoshield-logs/app.log` - same reason; the app
+     already falls back to console-only logging if this path isn't
+     writable, and Vercel captures stdout as function logs regardless.
+   - `MAX_CONTENT_LENGTH_MB=2` - Vercel's platform-level request body
+     limit (~4.5MB, not configurable) sits below the app's local
+     default of 10MB, and the image-analysis endpoint uploads two
+     files in one request.
+
+**Required environment variables** (Project → Settings → Environment
+Variables): `FLASK_ENV=production`, `DEBUG=False`, `SECRET_KEY`
+(random, generated per deployment - never committed),
+`UPLOAD_TEMP_DIR=/tmp/stegoshield`, `LOG_FILE=/tmp/stegoshield-logs/app.log`,
+`MAX_CONTENT_LENGTH_MB=2`. See `.env.example` for the full list and
+local-development defaults.
+
+**Known limitations of this deployment** (stated plainly, not hidden):
+- **Per-instance rate limiting.** Flask-Limiter's default in-memory
+  store isn't shared across serverless instances, so the configured
+  limits apply per warm container, not globally. A distributed store
+  (e.g. Redis) would be needed for a true global limit; out of scope
+  for a portfolio demo.
+- **Cold starts.** Importing `scipy`/`scikit-learn`/`scikit-image`/
+  `matplotlib` and loading the model takes several seconds on a cold
+  container. Subsequent requests to a warm instance are fast because
+  `ModelRegistry` (see `app/steganalysis/predictor.py`) caches the
+  loaded model in-process.
+- **2MB upload ceiling** on the public deployment (vs. 10MB locally),
+  imposed by Vercel's platform request-size limit, not by the app.
+- **No persistent storage** - uploads are processed in memory/`/tmp`
+  and never retained, by design (see `app/security/file_handler.py`);
+  this also means there's nothing to back up or migrate, but it's a
+  deliberate privacy/security property either way.
 
 ## 11. Reproducing the Experiments
 
