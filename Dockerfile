@@ -45,18 +45,34 @@ USER stego
 # Render (and most PaaS platforms) inject PORT at runtime; never
 # hardcode 5000 here.
 #
-# --workers 1: this is not a general recommendation, it's sized for
-# Render's free tier specifically (512MB RAM / 0.1 CPU - confirmed via
-# a real production failure: 2 workers each fully import numpy/scipy/
-# scikit-learn/scikit-image/matplotlib, and that alone was enough to
-# exceed 512MB under real request load, causing Render to OOM-kill and
-# restart the container - which surfaced as intermittent 502s on
-# encode/decode/steganalysis, not on lightweight requests like /api/health).
-# One worker halves that baseline import cost. It serializes requests
-# (fine for a low-traffic portfolio demo, not fine for real concurrent
-# load) - on a paid Render plan with more RAM, raise this back up.
+# This worker configuration is sized for Render's free tier
+# specifically (512MB RAM / 0.1 CPU), tuned through two real production
+# failures:
+#
+# 1. --workers 2 (the original setting) meant numpy/scipy/scikit-learn/
+#    scikit-image/matplotlib were each fully imported twice (once per
+#    worker *process*) - enough alone to exceed 512MB under real
+#    request load, so Render OOM-killed and restarted the container.
+#    That surfaced as 502s on encode/decode/steganalysis specifically,
+#    not on lightweight requests like /api/health.
+# 2. Dropping to a single sync worker (--workers 1, no thread support)
+#    fixed the memory problem but created a concurrency one: a sync
+#    worker handles exactly one request at a time, and a browser
+#    loading any page fires several concurrent requests (the HTML,
+#    CSS, JS, and a model-status API call) - with only one of those
+#    servable at once, the rest queued and Render's proxy timed them
+#    out as 503s.
+#
+# The fix for both at once: one worker *process* (keeps memory low -
+# nothing is imported twice) using the `gthread` worker class with
+# multiple threads (threads share one process's memory, so this adds
+# concurrency without multiplying import cost). This serves several
+# concurrent lightweight requests (page assets, health checks) via
+# threads while CPU-bound work (an actual encode/decode/steganalysis
+# request) still effectively serializes under Python's GIL - which is
+# fine for a low-traffic portfolio demo. On a paid Render plan with
+# more RAM, --workers can go back up for genuine parallelism.
 # --timeout 120 gives headroom for the largest image-analysis/
-# steganalysis requests now that they queue behind each other instead
-# of running in parallel.
+# steganalysis requests.
 EXPOSE 8000
-CMD ["sh", "-c", "gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout 120"]
+CMD ["sh", "-c", "gunicorn main:app --bind 0.0.0.0:${PORT:-8000} --workers 1 --worker-class gthread --threads 4 --timeout 120"]
