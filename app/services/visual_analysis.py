@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import io
+import threading
 
 import matplotlib
 
@@ -15,10 +16,18 @@ import matplotlib
 # auto-detected default backend is fragile (it can select an
 # interactive, non-thread-safe backend if a GUI toolkit happens to be
 # importable on the host) and would fail unpredictably outside this
-# sandbox's environment. Agg is also required for safe use of
-# `pyplot`'s global figure state if this code is ever called from more
-# than one thread within a process.
+# sandbox's environment.
 matplotlib.use("Agg")
+
+# `pyplot`'s current-figure state (plt.figure(), plt.close()) is a
+# module-level global, not thread-local - concurrent calls from
+# different threads of the same process race on it regardless of
+# backend. The production Gunicorn config uses a threaded worker
+# (gthread), so this lock serializes the only function here that
+# touches pyplot's global API; everything else in this module
+# (numpy array math, PIL encoding) has no shared state and doesn't
+# need it.
+_PYPLOT_LOCK = threading.Lock()
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -66,25 +75,28 @@ def compute_histograms(original: np.ndarray, modified: np.ndarray) -> dict:
 def render_histogram_figure(histograms: dict) -> str:
     """Render a matplotlib histogram comparison figure and return base64 PNG."""
     colors = {"red": "#ef4444", "green": "#22c55e", "blue": "#3b82f6", "gray": "#94a3b8"}
-    fig: Figure = plt.figure(figsize=(9, 3.2), dpi=110)
-    channels = list(histograms.keys())
-    for idx, name in enumerate(channels, start=1):
-        ax = fig.add_subplot(1, len(channels), idx)
-        bins = np.arange(256)
-        ax.plot(bins, histograms[name]["original"], color="#94a3b8", linewidth=1, label="Original")
-        ax.plot(bins, histograms[name]["stego"], color=colors.get(name, "#f97316"), linewidth=1, label="Stego")
-        ax.set_title(name.capitalize(), fontsize=9, color="#e2e8f0")
-        ax.tick_params(colors="#94a3b8", labelsize=7)
-        ax.set_facecolor("#0f172a")
-        for spine in ax.spines.values():
-            spine.set_color("#334155")
-        if idx == 1:
-            ax.legend(fontsize=6, facecolor="#0f172a", labelcolor="#e2e8f0", edgecolor="#334155")
-    fig.patch.set_facecolor("#0f172a")
-    fig.tight_layout()
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", facecolor=fig.get_facecolor())
-    plt.close(fig)
+    with _PYPLOT_LOCK:
+        fig: Figure = plt.figure(figsize=(9, 3.2), dpi=110)
+        try:
+            channels = list(histograms.keys())
+            for idx, name in enumerate(channels, start=1):
+                ax = fig.add_subplot(1, len(channels), idx)
+                bins = np.arange(256)
+                ax.plot(bins, histograms[name]["original"], color="#94a3b8", linewidth=1, label="Original")
+                ax.plot(bins, histograms[name]["stego"], color=colors.get(name, "#f97316"), linewidth=1, label="Stego")
+                ax.set_title(name.capitalize(), fontsize=9, color="#e2e8f0")
+                ax.tick_params(colors="#94a3b8", labelsize=7)
+                ax.set_facecolor("#0f172a")
+                for spine in ax.spines.values():
+                    spine.set_color("#334155")
+                if idx == 1:
+                    ax.legend(fontsize=6, facecolor="#0f172a", labelcolor="#e2e8f0", edgecolor="#334155")
+            fig.patch.set_facecolor("#0f172a")
+            fig.tight_layout()
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", facecolor=fig.get_facecolor())
+        finally:
+            plt.close(fig)
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
