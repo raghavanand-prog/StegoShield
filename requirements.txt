@@ -7,7 +7,7 @@ scikit-image==0.26.0
 scipy==1.17.1
 pandas==3.0.5
 matplotlib==3.11.1
-joblib==1.5.3
+joblib==1.6.0
 python-magic==0.4.27
 pylibmagic==0.5.0
 python-dotenv==1.2.2
