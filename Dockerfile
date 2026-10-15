@@ -5,7 +5,7 @@
 # "Production Deployment" for the full story), a normal Docker image
 # installs everything once at build time onto a persistent filesystem,
 # so that failure mode doesn't exist here.
-FROM python:3.11-slim AS base
+FROM python:3.14-slim AS base
 
 # libmagic1 gives python-magic (real content-type sniffing for upload
 # validation) its system library. python-dotenv/pip/etc need nothing
