@@ -8,7 +8,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import HTTPException
 
-from app.config import get_config
+from app.config import INSECURE_SECRET_KEYS, get_config
 from app.steganography.exceptions import SteganographyError
 from app.utils.errors import APIError, map_exception_to_api_error
 from app.utils.logging_config import configure_logging, get_logger
@@ -28,6 +28,7 @@ def create_app() -> Flask:
         static_folder="../frontend/static",
     )
     app.config.from_object(config_cls)
+    _require_real_secret_key_in_production(config_cls, app.config["SECRET_KEY"])
     app.config["MAX_CONTENT_LENGTH"] = config_cls.MAX_CONTENT_LENGTH
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=config_cls.PERMANENT_SESSION_LIFETIME_DAYS)
 
@@ -44,6 +45,30 @@ def create_app() -> Flask:
 
     logger.info("app_started", extra={"debug": app.config.get("DEBUG", False)})
     return app
+
+
+def _require_real_secret_key_in_production(config_cls, secret_key: str) -> None:
+    """Refuse to start in production with a known, public placeholder
+    SECRET_KEY.
+
+    Flask signs session cookies (and this app's CSRF token - see
+    app/auth/decorators.py) with SECRET_KEY. ProductionConfig and
+    DevelopmentConfig both inherit the same convenience default so local
+    `python run.py` works with zero setup, but that default - and the
+    .env.example placeholder - are public in this repo's git history.
+    Silently deploying with either one would mean every signed cookie is
+    forgeable by anyone who has read this source file. Development and
+    testing configs are intentionally exempt so the zero-setup local
+    workflow in README "Getting Started" keeps working unchanged.
+    """
+    if config_cls.__name__ != "ProductionConfig":
+        return
+    if secret_key in INSECURE_SECRET_KEYS:
+        raise RuntimeError(
+            "Refusing to start: FLASK_ENV=production but SECRET_KEY is "
+            "unset or still the placeholder value. Set a real, random "
+            "SECRET_KEY (see .env.example) before deploying."
+        )
 
 
 def _register_blueprints(app: Flask) -> None:

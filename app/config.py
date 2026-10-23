@@ -24,6 +24,19 @@ def _bool(name: str, default: bool) -> bool:
     return val.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# Known placeholder values for SECRET_KEY that must never be used outside
+# local development: the hardcoded fallback below, and the literal
+# placeholder shipped in .env.example. Both are public (they're in this
+# repo's git history), so a production deployment that ends up with either
+# one has session cookies signed with a key anyone can read on GitHub -
+# see create_app()'s fail-fast check in app/__init__.py.
+INSECURE_SECRET_KEYS = frozenset({
+    "dev-secret-key-change-me",
+    "change-this-to-a-long-random-value",
+    "",
+})
+
+
 class Config:
     """Base configuration shared by all environments."""
 
