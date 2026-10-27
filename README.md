@@ -1,5 +1,27 @@
 # StegoShield
 
+**Hides secret messages inside images, and uses machine learning to spot images that may be hiding one.**
+
+Why it exists: attackers can hide data inside ordinary-looking pictures (this is called steganography). StegoShield shows both sides in one app: how the hiding works, and how a defender can detect it.
+
+**Live demo: [stegoshield-5b8r.onrender.com](https://stegoshield-5b8r.onrender.com)** (no sign-up needed)
+
+## Try it
+
+1. Open the live demo.
+2. On **Encode**, upload an image, type a message and download the result.
+3. Upload that image to **Decode** to get the message back, or to **Steganalysis** to see whether the model flags it.
+
+![The StegoShield dashboard](docs/screenshots/01_dashboard.png)
+
+To run it on your own computer, see [Getting Started](#10-getting-started) below.
+
+---
+
+## Technical details
+
+Everything below is the full write-up for engineers and reviewers.
+
 > AI-Assisted Image Steganography & Steganalysis Platform
 
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
